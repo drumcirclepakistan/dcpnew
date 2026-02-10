@@ -1,7 +1,7 @@
 # Drum Circle Pakistan - Band Management System
 
 ## Overview
-A modern, mobile-friendly band management web app for Drum Circle Pakistan. Admin access for Haider Jamil with show management, financial tracking, band member management, and account provisioning. Future phases will add member-facing interfaces, invoices, and quotations.
+A modern, mobile-friendly band management web app for Drum Circle Pakistan. Admin access for Haider Jamil with show management, financial tracking, band member management, and account provisioning. Member-facing interface allows band members to view their assigned shows, earnings, and dashboard stats.
 
 ## Architecture
 - **Frontend**: React + Vite + TailwindCSS + shadcn/ui components
@@ -46,6 +46,17 @@ A modern, mobile-friendly band management web app for Drum Circle Pakistan. Admi
 - Dark mode toggle
 - Responsive sidebar navigation
 
+## Member-Facing Interface
+- Members log in with accounts created by admin (Settings > Band Members > Create Account)
+- **Member Dashboard**: Shows performed count, total earnings (paid shows only), upcoming shows, pending payments, top cities/types
+- **Member Shows**: Only shows where member is assigned (via show_members), with estimated earnings note for upcoming shows
+- **Member Financials**: Self-only view with paid/unpaid/pending breakdowns, no access to other members' data
+- **Permissions** (controlled by admin in Settings > Band Members):
+  - `canAddShows`: Allows member to create new shows via the show form
+  - `canEditName`: Allows member to update their display name (propagates to show_members records)
+- **Route Protection**: All admin routes use `requireAdmin` middleware; members cannot access show details, settings, expenses, or other admin-only features
+- **Sidebar**: Members see Dashboard, My Shows, My Earnings (no Settings, no Show Detail links)
+
 ## Payment Rules (Dynamic Per-Member Configs)
 - Each band member has configurable payment settings stored in `band_members` table:
   - `paymentType`: "fixed" or "percentage"
@@ -72,36 +83,41 @@ A modern, mobile-friendly band management web app for Drum Circle Pakistan. Admi
 - `POST /api/auth/login` - Login
 - `GET /api/auth/me` - Get current user
 - `POST /api/auth/logout` - Logout
-- `GET /api/shows` - List all shows (authenticated)
-- `GET /api/shows/check-date?date=&excludeId=` - Check for shows on same date
-- `GET /api/shows/:id` - Get show detail
-- `POST /api/shows` - Create show
-- `PATCH /api/shows/:id` - Update show
-- `DELETE /api/shows/:id` - Delete show
-- `PATCH /api/shows/:id/toggle-paid` - Toggle paid/unpaid status
-- `GET /api/shows/:id/expenses` - List expenses for show
-- `POST /api/shows/:id/expenses` - Add expense
-- `DELETE /api/shows/:id/expenses/:expenseId` - Remove expense
-- `GET /api/shows/:id/members` - List members for show
-- `PUT /api/shows/:id/members` - Replace all members for show
-- `POST /api/shows/:id/members` - Add member
-- `DELETE /api/shows/:id/members/:memberId` - Remove member
-- `GET /api/dashboard/stats?from=&to=` - Aggregated dashboard stats with time range filter (includes noAdvanceCount, topCities/topTypes only count completed shows)
-- `GET /api/financials?member=&from=&to=` - Per-member financial stats
-- `GET /api/band-members` - List all band members (with payment configs)
-- `POST /api/band-members` - Add band member
-- `PATCH /api/band-members/:id` - Update band member (role + payment config, optional applyToShowIds)
-- `GET /api/band-members/:id/upcoming-shows` - Get upcoming shows where this member is assigned
-- `DELETE /api/band-members/:id` - Delete band member
-- `POST /api/band-members/:id/create-account` - Create login account for member
-- `POST /api/band-members/:id/reset-password` - Reset member password
-- `DELETE /api/band-members/:id/delete-account` - Delete member login account
-- `GET /api/show-types` - List show types
-- `POST /api/show-types` - Add show type
-- `PATCH /api/show-types/:id` - Update show type
-- `DELETE /api/show-types/:id` - Delete show type
-- `GET /api/settings` - Get settings
-- `PUT /api/settings` - Update settings
+- `GET /api/shows` - List all shows (admin)
+- `GET /api/shows/check-date?date=&excludeId=` - Check for shows on same date (authenticated)
+- `GET /api/shows/:id` - Get show detail (admin)
+- `POST /api/shows` - Create show (admin)
+- `PATCH /api/shows/:id` - Update show (admin)
+- `DELETE /api/shows/:id` - Delete show (admin)
+- `PATCH /api/shows/:id/toggle-paid` - Toggle paid/unpaid status (admin)
+- `GET /api/shows/:id/expenses` - List expenses for show (admin)
+- `POST /api/shows/:id/expenses` - Add expense (admin)
+- `DELETE /api/shows/:id/expenses/:expenseId` - Remove expense (admin)
+- `GET /api/shows/:id/members` - List members for show (admin)
+- `PUT /api/shows/:id/members` - Replace all members for show (admin)
+- `POST /api/shows/:id/members` - Add member (admin)
+- `DELETE /api/shows/:id/members/:memberId` - Remove member (admin)
+- `GET /api/dashboard/stats?from=&to=` - Aggregated dashboard stats (admin)
+- `GET /api/financials?member=&from=&to=` - Per-member financial stats (admin)
+- `GET /api/band-members` - List all band members (admin)
+- `POST /api/band-members` - Add band member (admin)
+- `PATCH /api/band-members/:id` - Update band member (admin)
+- `GET /api/band-members/:id/upcoming-shows` - Get upcoming shows (admin)
+- `DELETE /api/band-members/:id` - Delete band member (admin)
+- `POST /api/band-members/:id/create-account` - Create login account (admin)
+- `POST /api/band-members/:id/reset-password` - Reset member password (admin)
+- `DELETE /api/band-members/:id/delete-account` - Delete member login account (admin)
+- `GET /api/show-types` - List show types (authenticated)
+- `POST /api/show-types` - Add show type (admin)
+- `PATCH /api/show-types/:id` - Update show type (admin)
+- `DELETE /api/show-types/:id` - Delete show type (admin)
+- `GET /api/settings` - Get settings (admin)
+- `PUT /api/settings` - Update settings (admin)
+- `GET /api/member/shows` - List member's assigned shows (member)
+- `GET /api/member/dashboard?from=&to=` - Member dashboard stats (member)
+- `GET /api/member/financials?from=&to=` - Member financial stats (member)
+- `PATCH /api/member/name` - Update member's own name (member, requires canEditName)
+- `POST /api/member/shows` - Create show as member (member, requires canAddShows)
 
 ## User Preferences
 - Pakistani Rupees (Rs) for currency
