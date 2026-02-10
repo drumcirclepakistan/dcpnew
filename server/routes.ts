@@ -452,34 +452,6 @@ export async function registerRoutes(
         filteredShows = filteredShows.filter((s) => new Date(s.showDate) <= toDate);
       }
 
-      const allBandMembers = await storage.getBandMembers();
-      const bandMemberConfigMap: Record<string, typeof allBandMembers[0]> = {};
-      for (const bm of allBandMembers) {
-        bandMemberConfigMap[bm.name] = bm;
-      }
-
-      const calcPayout = (
-        m: { name: string; paymentType: string; paymentValue: number; isReferrer: boolean; referralRate?: number | null; hasMinLogic?: boolean; minThreshold?: number | null; minFlatRate?: number | null },
-        showTotal: number,
-        netAmount: number,
-        totalExp: number
-      ): number => {
-        if (m.paymentType === "percentage") {
-          if (m.isReferrer && m.referralRate) {
-            return Math.round((m.referralRate / 100) * netAmount);
-          }
-          if (m.hasMinLogic && m.minThreshold && m.minFlatRate) {
-            if (showTotal < m.minThreshold) {
-              if (totalExp === 0) return m.minFlatRate;
-              const deduction = Math.round((m.paymentValue / 100) * totalExp);
-              return Math.max(0, m.minFlatRate - deduction);
-            }
-          }
-          return Math.round((m.paymentValue / 100) * netAmount);
-        }
-        return m.paymentValue;
-      };
-
       let totalExpenses = 0;
       let totalMemberPayouts = 0;
 
@@ -489,10 +461,9 @@ export async function registerRoutes(
         totalExpenses += expenseSum;
 
         const members = await storage.getShowMembers(show.id);
-        const net = show.totalAmount - expenseSum;
         let memberPayout = 0;
         for (const m of members) {
-          memberPayout += calcPayout(m, show.totalAmount, net, expenseSum);
+          memberPayout += m.calculatedAmount;
         }
         totalMemberPayouts += memberPayout;
       }
@@ -557,34 +528,6 @@ export async function registerRoutes(
         filteredShows = filteredShows.filter((s) => new Date(s.showDate) <= toDate);
       }
 
-      const allBandMembers = await storage.getBandMembers();
-      const bandMemberConfigMap: Record<string, typeof allBandMembers[0]> = {};
-      for (const bm of allBandMembers) {
-        bandMemberConfigMap[bm.name] = bm;
-      }
-
-      const calculateMemberPayout = (
-        showMember: { name: string; paymentType: string; paymentValue: number; isReferrer: boolean; referralRate?: number | null; hasMinLogic?: boolean; minThreshold?: number | null; minFlatRate?: number | null },
-        showTotal: number,
-        netAmount: number,
-        totalExpenses: number
-      ): number => {
-        if (showMember.paymentType === "percentage") {
-          if (showMember.isReferrer && showMember.referralRate) {
-            return Math.round((showMember.referralRate / 100) * netAmount);
-          }
-          if (showMember.hasMinLogic && showMember.minThreshold && showMember.minFlatRate) {
-            if (showTotal < showMember.minThreshold) {
-              if (totalExpenses === 0) return showMember.minFlatRate;
-              const deduction = Math.round((showMember.paymentValue / 100) * totalExpenses);
-              return Math.max(0, showMember.minFlatRate - deduction);
-            }
-          }
-          return Math.round((showMember.paymentValue / 100) * netAmount);
-        }
-        return showMember.paymentValue;
-      };
-
       interface ShowDetail {
         id: string;
         title: string;
@@ -615,7 +558,7 @@ export async function registerRoutes(
         if (member === "Haider Jamil") {
           let totalMemberPayouts = 0;
           for (const m of members) {
-            totalMemberPayouts += calculateMemberPayout(m, show.totalAmount, net, expenseSum);
+            totalMemberPayouts += m.calculatedAmount;
           }
           memberEarning = net - totalMemberPayouts;
           participated = true;
@@ -623,7 +566,7 @@ export async function registerRoutes(
           const found = members.find((m) => m.name === member);
           if (found) {
             participated = true;
-            memberEarning = calculateMemberPayout(found, show.totalAmount, net, expenseSum);
+            memberEarning = found.calculatedAmount;
           }
         }
 
@@ -714,29 +657,7 @@ export async function registerRoutes(
         const members = await storage.getShowMembers(show.id);
         const found = members.find(m => m.name === member.name);
         if (found) {
-          const expenses = await storage.getShowExpenses(show.id);
-          const expenseSum = expenses.reduce((s, e) => s + e.amount, 0);
-          const net = show.totalAmount - expenseSum;
-
-          const calcPayout = (
-            m: { paymentType: string; paymentValue: number; isReferrer: boolean; referralRate?: number | null; hasMinLogic?: boolean; minThreshold?: number | null; minFlatRate?: number | null },
-            showTotal: number, netAmount: number, totalExp: number
-          ): number => {
-            if (m.paymentType === "percentage") {
-              if (m.isReferrer && m.referralRate) return Math.round((m.referralRate / 100) * netAmount);
-              if (m.hasMinLogic && m.minThreshold && m.minFlatRate) {
-                if (showTotal < m.minThreshold) {
-                  if (totalExp === 0) return m.minFlatRate;
-                  const deduction = Math.round((m.paymentValue / 100) * totalExp);
-                  return Math.max(0, m.minFlatRate - deduction);
-                }
-              }
-              return Math.round((m.paymentValue / 100) * netAmount);
-            }
-            return m.paymentValue;
-          };
-
-          const myEarning = calcPayout(found, show.totalAmount, net, expenseSum);
+          const myEarning = found.calculatedAmount;
           const isUpcoming = new Date(show.showDate) > new Date();
 
           memberShows.push({
@@ -778,24 +699,6 @@ export async function registerRoutes(
       if (from) filteredShows = filteredShows.filter(s => new Date(s.showDate) >= new Date(from));
       if (to) filteredShows = filteredShows.filter(s => new Date(s.showDate) <= new Date(to));
 
-      const calcPayout = (
-        m: { paymentType: string; paymentValue: number; isReferrer: boolean; referralRate?: number | null; hasMinLogic?: boolean; minThreshold?: number | null; minFlatRate?: number | null },
-        showTotal: number, netAmount: number, totalExp: number
-      ): number => {
-        if (m.paymentType === "percentage") {
-          if (m.isReferrer && m.referralRate) return Math.round((m.referralRate / 100) * netAmount);
-          if (m.hasMinLogic && m.minThreshold && m.minFlatRate) {
-            if (showTotal < m.minThreshold) {
-              if (totalExp === 0) return m.minFlatRate;
-              const deduction = Math.round((m.paymentValue / 100) * totalExp);
-              return Math.max(0, m.minFlatRate - deduction);
-            }
-          }
-          return Math.round((m.paymentValue / 100) * netAmount);
-        }
-        return m.paymentValue;
-      };
-
       let totalEarnings = 0;
       let showsPerformed = 0;
       let upcomingCount = 0;
@@ -811,10 +714,7 @@ export async function registerRoutes(
         const found = members.find(m => m.name === member.name);
         if (!found) continue;
 
-        const expenses = await storage.getShowExpenses(show.id);
-        const expenseSum = expenses.reduce((s, e) => s + e.amount, 0);
-        const net = show.totalAmount - expenseSum;
-        const myEarning = calcPayout(found, show.totalAmount, net, expenseSum);
+        const myEarning = found.calculatedAmount;
         const isUpcoming = new Date(show.showDate) > new Date();
 
         if (found.isReferrer) referredCount++;
@@ -847,7 +747,6 @@ export async function registerRoutes(
         }
       }
 
-      // Upcoming count should always be from all shows, not filtered
       let totalUpcoming = 0;
       let totalPending = 0;
       for (const show of allShows) {
@@ -856,10 +755,7 @@ export async function registerRoutes(
         const found = members.find(m => m.name === member.name);
         if (!found) continue;
         totalUpcoming++;
-        const expenses = await storage.getShowExpenses(show.id);
-        const expenseSum = expenses.reduce((s, e) => s + e.amount, 0);
-        const net = show.totalAmount - expenseSum;
-        totalPending += calcPayout(found, show.totalAmount, net, expenseSum);
+        totalPending += found.calculatedAmount;
       }
 
       const topCities = Object.entries(cityCount).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([city, count]) => ({ city, count }));
@@ -894,24 +790,6 @@ export async function registerRoutes(
       if (from) filteredShows = filteredShows.filter(s => new Date(s.showDate) >= new Date(from));
       if (to) filteredShows = filteredShows.filter(s => new Date(s.showDate) <= new Date(to));
 
-      const calcPayout = (
-        m: { paymentType: string; paymentValue: number; isReferrer: boolean; referralRate?: number | null; hasMinLogic?: boolean; minThreshold?: number | null; minFlatRate?: number | null },
-        showTotal: number, netAmount: number, totalExp: number
-      ): number => {
-        if (m.paymentType === "percentage") {
-          if (m.isReferrer && m.referralRate) return Math.round((m.referralRate / 100) * netAmount);
-          if (m.hasMinLogic && m.minThreshold && m.minFlatRate) {
-            if (showTotal < m.minThreshold) {
-              if (totalExp === 0) return m.minFlatRate;
-              const deduction = Math.round((m.paymentValue / 100) * totalExp);
-              return Math.max(0, m.minFlatRate - deduction);
-            }
-          }
-          return Math.round((m.paymentValue / 100) * netAmount);
-        }
-        return m.paymentValue;
-      };
-
       const pastShows: any[] = [];
       const upcomingShows: any[] = [];
       let totalEarnings = 0;
@@ -924,10 +802,7 @@ export async function registerRoutes(
         const found = members.find(m => m.name === member.name);
         if (!found) continue;
 
-        const expenses = await storage.getShowExpenses(show.id);
-        const expenseSum = expenses.reduce((s, e) => s + e.amount, 0);
-        const net = show.totalAmount - expenseSum;
-        const myEarning = calcPayout(found, show.totalAmount, net, expenseSum);
+        const myEarning = found.calculatedAmount;
         const isUpcoming = new Date(show.showDate) > new Date();
 
         if (found.isReferrer) referredCount++;
