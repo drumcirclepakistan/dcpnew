@@ -236,19 +236,25 @@ export async function registerRoutes(
     });
   });
 
-  // Shows CRUD
-  app.get("/api/shows", requireAuth, async (req, res) => {
+  // Shows CRUD (admin only)
+  app.get("/api/shows", requireAdmin, async (req, res) => {
     const showsList = await storage.getShows(req.session.userId!);
     res.json(showsList);
   });
 
-  // Duplicate date check (must be before :id route)
+  // Duplicate date check (must be before :id route) - accessible to members with canAddShows
   app.get("/api/shows/check-date", requireAuth, async (req, res) => {
     try {
       const { date, excludeId } = req.query as { date?: string; excludeId?: string };
       if (!date) return res.json({ conflicts: [] });
 
-      const allShows = await storage.getShows(req.session.userId!);
+      const user = await storage.getUser(req.session.userId!);
+      let allShows;
+      if (user && user.role === "member") {
+        allShows = await getAllShowsForMember();
+      } else {
+        allShows = await storage.getShows(req.session.userId!);
+      }
       const targetDate = new Date(date);
       const conflicts = allShows.filter((s) => {
         if (excludeId && s.id === excludeId) return false;
@@ -270,7 +276,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/shows/:id", requireAuth, async (req, res) => {
+  app.get("/api/shows/:id", requireAdmin, async (req, res) => {
     const show = await storage.getShow(req.params.id as string);
     if (!show || show.userId !== req.session.userId) {
       return res.status(404).json({ message: "Show not found" });
@@ -278,7 +284,7 @@ export async function registerRoutes(
     res.json(show);
   });
 
-  app.post("/api/shows", requireAuth, async (req, res) => {
+  app.post("/api/shows", requireAdmin, async (req, res) => {
     try {
       const parsed = insertShowSchema.parse(req.body);
       const show = await storage.createShow({
@@ -291,7 +297,7 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/shows/:id", requireAuth, async (req, res) => {
+  app.patch("/api/shows/:id", requireAdmin, async (req, res) => {
     try {
       const existing = await storage.getShow(req.params.id as string);
       if (!existing || existing.userId !== req.session.userId) {
@@ -305,7 +311,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/shows/:id", requireAuth, async (req, res) => {
+  app.delete("/api/shows/:id", requireAdmin, async (req, res) => {
     const existing = await storage.getShow(req.params.id as string);
     if (!existing || existing.userId !== req.session.userId) {
       return res.status(404).json({ message: "Show not found" });
@@ -314,8 +320,8 @@ export async function registerRoutes(
     res.json({ message: "Deleted" });
   });
 
-  // Show Expenses
-  app.get("/api/shows/:id/expenses", requireAuth, async (req, res) => {
+  // Show Expenses (admin only)
+  app.get("/api/shows/:id/expenses", requireAdmin, async (req, res) => {
     const show = await storage.getShow(req.params.id as string);
     if (!show || show.userId !== req.session.userId) {
       return res.status(404).json({ message: "Show not found" });
@@ -324,7 +330,7 @@ export async function registerRoutes(
     res.json(expenses);
   });
 
-  app.post("/api/shows/:id/expenses", requireAuth, async (req, res) => {
+  app.post("/api/shows/:id/expenses", requireAdmin, async (req, res) => {
     try {
       const show = await storage.getShow(req.params.id as string);
       if (!show || show.userId !== req.session.userId) {
@@ -338,13 +344,13 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/shows/:id/expenses/:expenseId", requireAuth, async (req, res) => {
+  app.delete("/api/shows/:id/expenses/:expenseId", requireAdmin, async (req, res) => {
     await storage.deleteExpense(req.params.expenseId as string);
     res.json({ message: "Deleted" });
   });
 
-  // Show Members
-  app.get("/api/shows/:id/members", requireAuth, async (req, res) => {
+  // Show Members (admin only)
+  app.get("/api/shows/:id/members", requireAdmin, async (req, res) => {
     const show = await storage.getShow(req.params.id as string);
     if (!show || show.userId !== req.session.userId) {
       return res.status(404).json({ message: "Show not found" });
@@ -353,7 +359,7 @@ export async function registerRoutes(
     res.json(members);
   });
 
-  app.post("/api/shows/:id/members", requireAuth, async (req, res) => {
+  app.post("/api/shows/:id/members", requireAdmin, async (req, res) => {
     try {
       const show = await storage.getShow(req.params.id as string);
       if (!show || show.userId !== req.session.userId) {
@@ -367,7 +373,7 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/shows/:id/members/:memberId", requireAuth, async (req, res) => {
+  app.patch("/api/shows/:id/members/:memberId", requireAdmin, async (req, res) => {
     try {
       const updated = await storage.updateMember(req.params.memberId as string, req.body);
       res.json(updated);
@@ -376,13 +382,13 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/shows/:id/members/:memberId", requireAuth, async (req, res) => {
+  app.delete("/api/shows/:id/members/:memberId", requireAdmin, async (req, res) => {
     await storage.deleteMember(req.params.memberId as string);
     res.json({ message: "Deleted" });
   });
 
   // Save all members for a show at once (replaces existing)
-  app.put("/api/shows/:id/members", requireAuth, async (req, res) => {
+  app.put("/api/shows/:id/members", requireAdmin, async (req, res) => {
     try {
       const show = await storage.getShow(req.params.id as string);
       if (!show || show.userId !== req.session.userId) {
@@ -402,8 +408,8 @@ export async function registerRoutes(
     }
   });
 
-  // Toggle paid status
-  app.patch("/api/shows/:id/toggle-paid", requireAuth, async (req, res) => {
+  // Toggle paid status (admin only)
+  app.patch("/api/shows/:id/toggle-paid", requireAdmin, async (req, res) => {
     try {
       const existing = await storage.getShow(req.params.id as string);
       if (!existing || existing.userId !== req.session.userId) {
@@ -418,8 +424,8 @@ export async function registerRoutes(
     }
   });
 
-  // Dashboard stats with time range
-  app.get("/api/dashboard/stats", requireAuth, async (req, res) => {
+  // Dashboard stats with time range (admin only)
+  app.get("/api/dashboard/stats", requireAdmin, async (req, res) => {
     try {
       const allShows = await storage.getShows(req.session.userId!);
       const { from, to } = req.query as { from?: string; to?: string };
@@ -523,8 +529,8 @@ export async function registerRoutes(
     }
   });
 
-  // Financials per-member stats
-  app.get("/api/financials", requireAuth, async (req, res) => {
+  // Financials per-member stats (admin only)
+  app.get("/api/financials", requireAdmin, async (req, res) => {
     try {
       const allShows = await storage.getShows(req.session.userId!);
       const { from, to, member } = req.query as { from?: string; to?: string; member?: string };
@@ -1003,8 +1009,8 @@ export async function registerRoutes(
     }
   });
 
-  // Settings
-  app.get("/api/settings", requireAuth, async (req, res) => {
+  // Settings (admin only)
+  app.get("/api/settings", requireAdmin, async (req, res) => {
     const userSettings = await storage.getSettings(req.session.userId!);
     const merged = { ...defaultSettings };
     for (const s of userSettings) {
@@ -1013,7 +1019,7 @@ export async function registerRoutes(
     res.json(merged);
   });
 
-  app.put("/api/settings", requireAuth, async (req, res) => {
+  app.put("/api/settings", requireAdmin, async (req, res) => {
     try {
       const entries = Object.entries(req.body) as [string, string][];
       for (const [key, value] of entries) {
@@ -1030,8 +1036,8 @@ export async function registerRoutes(
     }
   });
 
-  // Band Members CRUD
-  app.get("/api/band-members", requireAuth, async (req, res) => {
+  // Band Members CRUD (admin only)
+  app.get("/api/band-members", requireAdmin, async (req, res) => {
     const members = await storage.getBandMembers();
     res.json(members);
   });
