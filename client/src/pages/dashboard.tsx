@@ -385,9 +385,9 @@ export default function Dashboard() {
                             {format(new Date(show.showDate), "MMM d, yyyy")}
                           </span>
                         </div>
-                        {show.organizationName && (
+                        {(show.organizationName || show.publicShowFor) && (
                           <p className="text-xs text-muted-foreground mt-0.5">
-                            {show.organizationName}
+                            {show.organizationName || show.publicShowFor}
                           </p>
                         )}
                       </div>

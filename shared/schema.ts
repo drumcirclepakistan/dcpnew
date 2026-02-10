@@ -29,6 +29,7 @@ export const shows = pgTable("shows", {
   city: text("city").notNull(),
   showType: showTypeEnum("show_type").notNull(),
   organizationName: text("organization_name"),
+  publicShowFor: text("public_show_for"),
   totalAmount: integer("total_amount").notNull(),
   advancePayment: integer("advance_payment").notNull().default(0),
   showDate: timestamp("show_date").notNull(),
@@ -55,6 +56,7 @@ export const insertShowSchema = createInsertSchema(shows).omit({
   pocName: z.string().optional().nullable(),
   pocPhone: z.string().optional().nullable(),
   pocEmail: z.string().optional().nullable(),
+  publicShowFor: z.string().optional().nullable(),
   isPaid: z.boolean().optional(),
 });
 

@@ -49,6 +49,7 @@ export default function ShowForm() {
       city: "",
       showType: "Corporate",
       organizationName: "",
+      publicShowFor: "",
       totalAmount: 0,
       advancePayment: 0,
       showDate: new Date(),
@@ -67,6 +68,7 @@ export default function ShowForm() {
         city: existingShow.city,
         showType: existingShow.showType,
         organizationName: existingShow.organizationName || "",
+        publicShowFor: existingShow.publicShowFor || "",
         totalAmount: existingShow.totalAmount,
         advancePayment: existingShow.advancePayment,
         showDate: new Date(existingShow.showDate),
@@ -112,6 +114,7 @@ export default function ShowForm() {
 
   const showType = form.watch("showType");
   const needsOrg = showType === "Corporate" || showType === "University";
+  const isPublic = showType === "Public";
 
   if (isEditing && isLoadingShow) {
     return (
@@ -221,6 +224,27 @@ export default function ShowForm() {
                           value={field.value || ""}
                           data-testid="input-organization"
                           placeholder={showType === "University" ? "e.g. LUMS, IBA Karachi" : "e.g. Unilever, Jazz"}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+
+              {isPublic && (
+                <FormField
+                  control={form.control}
+                  name="publicShowFor"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Public Show For (Optional)</FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          value={field.value || ""}
+                          data-testid="input-public-show-for"
+                          placeholder="e.g. Cafe Aylanto, Monal Restaurant"
                         />
                       </FormControl>
                       <FormMessage />

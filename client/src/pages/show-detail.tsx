@@ -426,6 +426,16 @@ export default function ShowDetail() {
                 </div>
               )}
 
+              {show.publicShowFor && (
+                <div className="flex items-start gap-3">
+                  <Building2 className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="text-xs text-muted-foreground">Public Show For</p>
+                    <p className="text-sm font-medium" data-testid="text-detail-public-show-for">{show.publicShowFor}</p>
+                  </div>
+                </div>
+              )}
+
               <div className="border-t pt-5">
                 <div className="grid grid-cols-3 gap-4">
                   <div>

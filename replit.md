@@ -19,6 +19,7 @@ A modern, mobile-friendly band management web app for Drum Circle Pakistan. Curr
 - Full show CRUD (add, view, edit, delete)
 - Show types: Corporate, Private, Public, University
 - Organization tracking for Corporate/University shows
+- "Public Show For" field for Public shows (e.g. cafe, restaurant name)
 - Financial tracking: total amount, advance payment, pending amount
 - Paid/Unpaid tracking per show with toggle button on show detail page
 - Shows list highlights completed-but-unpaid shows in a red "Action Required" section

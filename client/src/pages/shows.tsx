@@ -45,7 +45,8 @@ export default function ShowsPage() {
           !search ||
           s.title.toLowerCase().includes(search.toLowerCase()) ||
           s.city.toLowerCase().includes(search.toLowerCase()) ||
-          s.organizationName?.toLowerCase().includes(search.toLowerCase());
+          s.organizationName?.toLowerCase().includes(search.toLowerCase()) ||
+          s.publicShowFor?.toLowerCase().includes(search.toLowerCase());
         const matchesStatus = statusFilter === "all" || s.status === statusFilter;
         const matchesType = typeFilter === "all" || s.showType === typeFilter;
         const matchesPaid = paidFilter === "all" || (paidFilter === "paid" ? s.isPaid : !s.isPaid);
@@ -105,9 +106,9 @@ export default function ShowsPage() {
                     {format(new Date(show.showDate), "MMM d, yyyy 'at' h:mm a")}
                   </span>
                 </div>
-                {show.organizationName && (
+                {(show.organizationName || show.publicShowFor) && (
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    {show.organizationName}
+                    {show.organizationName || show.publicShowFor}
                   </p>
                 )}
               </div>
