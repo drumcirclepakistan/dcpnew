@@ -225,6 +225,7 @@ export async function registerRoutes(
         bandMemberName: bandMember?.name || null,
         canAddShows: bandMember?.canAddShows || false,
         canEditName: bandMember?.canEditName || false,
+        canViewAmounts: bandMember?.canViewAmounts || false,
       });
     }
     res.json(safeUser);

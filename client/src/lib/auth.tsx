@@ -7,6 +7,7 @@ interface ExtendedUser extends User {
   bandMemberName?: string | null;
   canAddShows?: boolean;
   canEditName?: boolean;
+  canViewAmounts?: boolean;
 }
 
 interface AuthContextType {
