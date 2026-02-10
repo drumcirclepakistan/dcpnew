@@ -1,0 +1,197 @@
+import { useQuery } from "@tanstack/react-query";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { CalendarPlus, Search, ListMusic, Filter } from "lucide-react";
+import { format } from "date-fns";
+import { Link } from "wouter";
+import { useState, useMemo } from "react";
+import type { Show } from "@shared/schema";
+
+const statusColors: Record<string, string> = {
+  upcoming: "default",
+  completed: "secondary",
+  cancelled: "destructive",
+};
+
+const showTypeBadgeVariant = (type: string) => {
+  switch (type) {
+    case "Corporate": return "default";
+    case "University": return "secondary";
+    case "Private": return "outline";
+    case "Public": return "secondary";
+    default: return "outline";
+  }
+};
+
+export default function ShowsPage() {
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [typeFilter, setTypeFilter] = useState("all");
+
+  const { data: shows, isLoading } = useQuery<Show[]>({
+    queryKey: ["/api/shows"],
+  });
+
+  const filtered = useMemo(() => {
+    if (!shows) return [];
+    return shows
+      .filter((s) => {
+        const matchesSearch =
+          !search ||
+          s.title.toLowerCase().includes(search.toLowerCase()) ||
+          s.city.toLowerCase().includes(search.toLowerCase()) ||
+          s.organizationName?.toLowerCase().includes(search.toLowerCase());
+        const matchesStatus = statusFilter === "all" || s.status === statusFilter;
+        const matchesType = typeFilter === "all" || s.showType === typeFilter;
+        return matchesSearch && matchesStatus && matchesType;
+      })
+      .sort((a, b) => new Date(b.showDate).getTime() - new Date(a.showDate).getTime());
+  }, [shows, search, statusFilter, typeFilter]);
+
+  return (
+    <div className="p-4 md:p-6 space-y-5 max-w-5xl mx-auto">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div>
+          <h1 className="text-xl font-bold" data-testid="text-shows-heading">Shows</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Manage all your performances
+          </p>
+        </div>
+        <Link href="/shows/new">
+          <Button data-testid="button-add-show">
+            <CalendarPlus className="w-4 h-4 mr-2" />
+            Add Show
+          </Button>
+        </Link>
+      </div>
+
+      <div className="flex items-center gap-2 flex-wrap">
+        <div className="relative flex-1 min-w-[200px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            data-testid="input-search-shows"
+            placeholder="Search shows..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-[130px]" data-testid="select-status-filter">
+            <Filter className="w-3.5 h-3.5 mr-1.5" />
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Status</SelectItem>
+            <SelectItem value="upcoming">Upcoming</SelectItem>
+            <SelectItem value="completed">Completed</SelectItem>
+            <SelectItem value="cancelled">Cancelled</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={typeFilter} onValueChange={setTypeFilter}>
+          <SelectTrigger className="w-[140px]" data-testid="select-type-filter">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Types</SelectItem>
+            <SelectItem value="Corporate">Corporate</SelectItem>
+            <SelectItem value="Private">Private</SelectItem>
+            <SelectItem value="Public">Public</SelectItem>
+            <SelectItem value="University">University</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {isLoading ? (
+        <div className="space-y-2">
+          {[1, 2, 3, 4].map((i) => (
+            <Card key={i}>
+              <CardContent className="pt-4 pb-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="space-y-2 flex-1">
+                    <Skeleton className="h-5 w-48" />
+                    <Skeleton className="h-4 w-32" />
+                  </div>
+                  <Skeleton className="h-6 w-20" />
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : filtered.length === 0 ? (
+        <Card>
+          <CardContent className="pt-10 pb-10 flex flex-col items-center justify-center">
+            <ListMusic className="w-12 h-12 text-muted-foreground mb-3" />
+            <p className="text-sm font-medium text-foreground" data-testid="text-no-shows">
+              {shows?.length === 0 ? "No shows yet" : "No shows match your filters"}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {shows?.length === 0
+                ? "Add your first show to get started"
+                : "Try adjusting your search or filters"}
+            </p>
+            {shows?.length === 0 && (
+              <Link href="/shows/new">
+                <Button className="mt-4" data-testid="button-add-first-show">
+                  <CalendarPlus className="w-4 h-4 mr-2" />
+                  Add Show
+                </Button>
+              </Link>
+            )}
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-2">
+          {filtered.map((show) => (
+            <Link key={show.id} href={`/shows/${show.id}`}>
+              <Card className="hover-elevate cursor-pointer" data-testid={`card-show-${show.id}`}>
+                <CardContent className="pt-4 pb-4">
+                  <div className="flex items-start justify-between gap-3 flex-wrap">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-medium text-sm" data-testid={`text-show-title-${show.id}`}>
+                          {show.title}
+                        </p>
+                        <Badge variant={statusColors[show.status] as any} className="text-[10px]">
+                          {show.status}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                        <span className="text-xs text-muted-foreground">{show.city}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {format(new Date(show.showDate), "MMM d, yyyy 'at' h:mm a")}
+                        </span>
+                      </div>
+                      {show.organizationName && (
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {show.organizationName}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+                      <Badge variant={showTypeBadgeVariant(show.showType) as any}>
+                        {show.showType}
+                      </Badge>
+                      <span className="text-sm font-semibold" data-testid={`text-show-amount-${show.id}`}>
+                        Rs {show.totalAmount.toLocaleString()}
+                      </span>
+                      {show.advancePayment > 0 && (
+                        <span className="text-[10px] text-muted-foreground">
+                          Advance: Rs {show.advancePayment.toLocaleString()}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
