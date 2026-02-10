@@ -62,8 +62,10 @@ export interface IStorage {
   deleteUser(id: string): Promise<boolean>;
 
   getShowTypes(userId: string): Promise<{ id: string; name: string; userId: string }[]>;
+  getShowType(id: string): Promise<{ id: string; name: string; userId: string } | undefined>;
   createShowType(name: string, userId: string): Promise<{ id: string; name: string; userId: string }>;
   updateShowType(id: string, name: string): Promise<{ id: string; name: string; userId: string } | undefined>;
+  renameShowTypeInShows(oldName: string, newName: string): Promise<void>;
   deleteShowType(id: string): Promise<boolean>;
 }
 
@@ -228,6 +230,11 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(showTypesTable).where(eq(showTypesTable.userId, userId));
   }
 
+  async getShowType(id: string): Promise<{ id: string; name: string; userId: string } | undefined> {
+    const [found] = await db.select().from(showTypesTable).where(eq(showTypesTable.id, id));
+    return found;
+  }
+
   async createShowType(name: string, userId: string): Promise<{ id: string; name: string; userId: string }> {
     const [created] = await db.insert(showTypesTable).values({ name, userId }).returning();
     return created;
@@ -236,6 +243,10 @@ export class DatabaseStorage implements IStorage {
   async updateShowType(id: string, name: string): Promise<{ id: string; name: string; userId: string } | undefined> {
     const [updated] = await db.update(showTypesTable).set({ name }).where(eq(showTypesTable.id, id)).returning();
     return updated;
+  }
+
+  async renameShowTypeInShows(oldName: string, newName: string): Promise<void> {
+    await db.update(shows).set({ showType: newName }).where(eq(shows.showType, oldName));
   }
 
   async deleteShowType(id: string): Promise<boolean> {

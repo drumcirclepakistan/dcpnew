@@ -872,8 +872,15 @@ export async function registerRoutes(
     try {
       const { name } = req.body;
       if (!name || !name.trim()) return res.status(400).json({ message: "Name is required" });
-      const updated = await storage.updateShowType(req.params.id as string, name.trim());
+      const existing = await storage.getShowType(req.params.id as string);
+      if (!existing) return res.status(404).json({ message: "Show type not found" });
+      const oldName = existing.name;
+      const newName = name.trim();
+      const updated = await storage.updateShowType(req.params.id as string, newName);
       if (!updated) return res.status(404).json({ message: "Show type not found" });
+      if (oldName !== newName) {
+        await storage.renameShowTypeInShows(oldName, newName);
+      }
       res.json(updated);
     } catch (err: any) {
       res.status(400).json({ message: err.message || "Failed to update show type" });
