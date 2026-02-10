@@ -48,6 +48,8 @@ A modern, mobile-friendly band management web app for Drum Circle Pakistan. Admi
 - **Directory**: Full-text search across all show data (title, city, organization, contact details, notes), date range filtering, summary stats (total/completed/upcoming/paid/unpaid/revenue), show type breakdown, organization grouping with expandable show lists, and one-click contact details dialog
 - Dark mode toggle
 - Responsive sidebar navigation
+- **Live data**: Auto-refresh every 30s (15s for dashboard), refetch on window focus, staleTime 10s
+- **Pull-to-refresh**: Mobile touch pull-down gesture to refresh all active data
 
 ## Member-Facing Interface
 - Members log in with accounts created by admin (Settings > Band Members > Create Account)

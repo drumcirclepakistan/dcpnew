@@ -179,6 +179,7 @@ export default function Dashboard() {
       return res.json();
     },
     enabled: !isMember,
+    refetchInterval: 15000,
   });
 
   const { data: memberStats, isLoading: memberStatsLoading } = useQuery<MemberDashboardStats>({
@@ -189,6 +190,7 @@ export default function Dashboard() {
       return res.json();
     },
     enabled: isMember,
+    refetchInterval: 15000,
   });
 
   const statsLoading = isMember ? memberStatsLoading : adminStatsLoading;

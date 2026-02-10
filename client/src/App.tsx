@@ -8,6 +8,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PullToRefresh } from "@/components/pull-to-refresh";
 import NotFound from "@/pages/not-found";
 import LoginPage from "@/pages/login";
 import Dashboard from "@/pages/dashboard";
@@ -65,9 +66,9 @@ function AppLayout() {
             <SidebarTrigger data-testid="button-sidebar-toggle" />
             <ThemeToggle />
           </header>
-          <main className="flex-1 overflow-auto">
+          <PullToRefresh>
             <Router />
-          </main>
+          </PullToRefresh>
         </div>
       </div>
     </SidebarProvider>
