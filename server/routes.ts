@@ -831,7 +831,7 @@ export async function registerRoutes(
       const founderTotalEarnings = founderEarningsFromPaidShows + founderCancelledEarnings;
 
       res.json({
-        totalShows: filteredShows.length,
+        showsPerformed: completedFilteredShows.length,
         totalRevenue,
         totalExpenses,
         revenueAfterExpenses,

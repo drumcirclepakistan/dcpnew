@@ -32,7 +32,7 @@ interface CustomDateRange {
 type TimeRange = "lifetime" | "this_year" | "last_year" | "this_month" | "last_month" | "last_3_months" | "last_6_months" | "custom";
 
 interface DashboardStats {
-  totalShows: number;
+  showsPerformed: number;
   totalRevenue: number;
   totalExpenses: number;
   revenueAfterExpenses: number;
@@ -577,10 +577,10 @@ export default function Dashboard() {
             ) : (
               <>
                 <StatCard
-                  label="Total Shows"
-                  value={adminStats?.totalShows || 0}
+                  label="Shows Performed"
+                  value={adminStats?.showsPerformed || 0}
                   icon={Music}
-                  testId="stat-total-shows"
+                  testId="stat-shows-performed"
                 />
                 <StatCard
                   label="Total Revenue"
@@ -603,7 +603,7 @@ export default function Dashboard() {
                   subtitle={
                     (adminStats?.founderCancelledEarnings || 0) > 0
                       ? `Rs ${(adminStats?.founderEarningsFromPaidShows || 0).toLocaleString()} from paid shows + Rs ${(adminStats?.founderCancelledEarnings || 0).toLocaleString()} from cancelled (unallocated)`
-                      : `From ${adminStats?.totalShows ? 'paid completed' : '0'} shows`
+                      : "From paid completed shows"
                   }
                 />
                 {(adminStats?.cancelledShowAmount || 0) > 0 && (
