@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -39,8 +39,11 @@ import {
 import { format } from "date-fns";
 import type { Invoice } from "@shared/schema";
 import jsPDF from "jspdf";
+import { LOGO_BASE64 } from "@/lib/invoice-logo";
 
-const TAX_RATE = 0.16;
+const BRAND_R = 237;
+const BRAND_G = 120;
+const BRAND_B = 37;
 
 function generateInvoicePDF(invoice: Invoice) {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
@@ -48,122 +51,108 @@ function generateInvoicePDF(invoice: Invoice) {
   const marginLeft = 20;
   const marginRight = 20;
   const contentWidth = pageWidth - marginLeft - marginRight;
+  const rightEdge = pageWidth - marginRight;
 
   const typeLabel = invoice.type === "invoice" ? "INVOICE" : "QUOTATION";
   const eventDateStr = format(new Date(invoice.eventDate), "dd MMM yyyy");
   const createdDateStr = format(new Date(invoice.createdAt), "dd MMM yyyy");
   const baseAmount = Number(invoice.amount);
+  const formattedAmount = `Rs ${baseAmount.toLocaleString()}`;
 
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(22);
-  doc.text(typeLabel, marginLeft, 30);
+  doc.setFillColor(BRAND_R, BRAND_G, BRAND_B);
+  doc.rect(0, 0, pageWidth, 4, "F");
 
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(11);
-  doc.text(invoice.displayNumber, pageWidth - marginRight, 30, { align: "right" });
-
-  let y = 42;
-  doc.setFontSize(10);
-  doc.setFont("helvetica", "normal");
-  doc.text("Date:", marginLeft, y);
-  doc.text(createdDateStr, pageWidth - marginRight, y, { align: "right" });
-  y += 7;
-  doc.text("Bill To:", marginLeft, y);
-  doc.setFont("helvetica", "bold");
-  doc.text(invoice.billTo, pageWidth - marginRight, y, { align: "right" });
-
-  y += 14;
-  doc.setDrawColor(180, 180, 180);
-  doc.setLineWidth(0.3);
-  doc.line(marginLeft, y, pageWidth - marginRight, y);
-
-  y += 8;
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(10);
-  doc.text("Description", marginLeft, y);
-  doc.text("Amount (Rs)", pageWidth - marginRight, y, { align: "right" });
-
-  y += 3;
-  doc.setDrawColor(220, 220, 220);
-  doc.setLineWidth(0.2);
-  doc.line(marginLeft, y, pageWidth - marginRight, y);
-
-  y += 8;
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(10);
-  const description = `DRUM CIRCLE \u2013 ${invoice.city} \u2013 ${eventDateStr} \u2013 ${invoice.numberOfDrums} DRUMS \u2013 ${invoice.duration}`;
-  const descLines = doc.splitTextToSize(description, contentWidth - 40);
-  doc.text(descLines, marginLeft, y);
-  doc.text(baseAmount.toLocaleString(), pageWidth - marginRight, y, { align: "right" });
-
-  y += descLines.length * 5 + 6;
-  doc.setDrawColor(180, 180, 180);
-  doc.setLineWidth(0.3);
-  doc.line(marginLeft, y, pageWidth - marginRight, y);
-
-  if (invoice.taxMode === "inclusive") {
-    const preGstAmount = Math.round(baseAmount / (1 + TAX_RATE));
-    const gstAmount = baseAmount - preGstAmount;
-
-    y += 7;
-    doc.setFont("helvetica", "normal");
-    doc.text("Amount before GST", marginLeft, y);
-    doc.text(preGstAmount.toLocaleString(), pageWidth - marginRight, y, { align: "right" });
-
-    y += 6;
-    doc.text(`GST (${Math.round(TAX_RATE * 100)}%)`, marginLeft, y);
-    doc.text(gstAmount.toLocaleString(), pageWidth - marginRight, y, { align: "right" });
-
-    y += 3;
-    doc.setDrawColor(220, 220, 220);
-    doc.setLineWidth(0.2);
-    doc.line(marginLeft, y, pageWidth - marginRight, y);
-
-    y += 7;
-    doc.setFont("helvetica", "bold");
-    doc.text("Total (Inclusive of GST)", marginLeft, y);
-    doc.text(baseAmount.toLocaleString(), pageWidth - marginRight, y, { align: "right" });
-  } else {
-    const gstAmount = Math.round(baseAmount * TAX_RATE);
-    const grandTotal = baseAmount + gstAmount;
-
-    y += 7;
-    doc.setFont("helvetica", "normal");
-    doc.text("Subtotal", marginLeft, y);
-    doc.text(baseAmount.toLocaleString(), pageWidth - marginRight, y, { align: "right" });
-
-    y += 6;
-    doc.text(`GST (${Math.round(TAX_RATE * 100)}%)`, marginLeft, y);
-    doc.text(gstAmount.toLocaleString(), pageWidth - marginRight, y, { align: "right" });
-
-    y += 3;
-    doc.setDrawColor(220, 220, 220);
-    doc.setLineWidth(0.2);
-    doc.line(marginLeft, y, pageWidth - marginRight, y);
-
-    y += 7;
-    doc.setFont("helvetica", "bold");
-    doc.text("Grand Total (Exclusive of GST)", marginLeft, y);
-    doc.text(grandTotal.toLocaleString(), pageWidth - marginRight, y, { align: "right" });
+  try {
+    doc.addImage(LOGO_BASE64, "PNG", marginLeft, 10, 28, 28);
+  } catch {
   }
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(24);
+  doc.setTextColor(BRAND_R, BRAND_G, BRAND_B);
+  doc.text(typeLabel, rightEdge, 22, { align: "right" });
+
+  doc.setFontSize(10);
+  doc.setTextColor(120, 120, 120);
+  doc.setFont("helvetica", "normal");
+  doc.text(invoice.displayNumber, rightEdge, 29, { align: "right" });
+  doc.text(`Date: ${createdDateStr}`, rightEdge, 35, { align: "right" });
+
+  let y = 48;
+  doc.setDrawColor(BRAND_R, BRAND_G, BRAND_B);
+  doc.setLineWidth(0.6);
+  doc.line(marginLeft, y, rightEdge, y);
 
   y += 10;
-  doc.setFont("helvetica", "italic");
+  doc.setTextColor(120, 120, 120);
+  doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
-  if (invoice.taxMode === "exclusive") {
-    doc.text("All applicable taxes (GST @ 16%) are charged separately as shown above.", marginLeft, y);
-  } else {
-    doc.text("All applicable taxes (GST @ 16%) are included in the total amount as shown above.", marginLeft, y);
-  }
+  doc.text("BILL TO", marginLeft, y);
+
+  y += 6;
+  doc.setTextColor(30, 30, 30);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(13);
+  doc.text(invoice.billTo, marginLeft, y);
 
   y += 14;
+  doc.setFillColor(245, 245, 245);
+  doc.roundedRect(marginLeft, y, contentWidth, 9, 1.5, 1.5, "F");
+
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(11);
-  doc.text("Terms & Requirements", marginLeft, y);
+  doc.setFontSize(9);
+  doc.setTextColor(80, 80, 80);
+  doc.text("DESCRIPTION", marginLeft + 4, y + 6);
+  doc.text("AMOUNT", rightEdge - 4, y + 6, { align: "right" });
+
+  y += 14;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  doc.setTextColor(50, 50, 50);
+  const description = `Drum Circle \u2013 ${invoice.city} \u2013 ${eventDateStr} \u2013 ${invoice.numberOfDrums} Drums \u2013 ${invoice.duration}`;
+  const descLines = doc.splitTextToSize(description, contentWidth - 50);
+  doc.text(descLines, marginLeft + 4, y);
+
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(30, 30, 30);
+  doc.text(formattedAmount, rightEdge - 4, y, { align: "right" });
+
+  y += descLines.length * 5 + 8;
+  doc.setDrawColor(220, 220, 220);
+  doc.setLineWidth(0.3);
+  doc.line(marginLeft, y, rightEdge, y);
+
   y += 8;
+  doc.setFillColor(BRAND_R, BRAND_G, BRAND_B);
+  doc.roundedRect(rightEdge - 70, y - 2, 70, 10, 1.5, 1.5, "F");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.setTextColor(255, 255, 255);
+  doc.text("TOTAL", rightEdge - 66, y + 5);
+  doc.text(formattedAmount, rightEdge - 4, y + 5, { align: "right" });
+
+  y += 16;
+  doc.setFont("helvetica", "italic");
+  doc.setFontSize(9);
+  doc.setTextColor(100, 100, 100);
+  if (invoice.taxMode === "inclusive") {
+    doc.text("All taxes inclusive.", marginLeft, y);
+  } else {
+    doc.text("Exclusive of all taxes. Any applicable taxes will be charged separately.", marginLeft, y);
+  }
+
+  y += 16;
+  doc.setFillColor(BRAND_R, BRAND_G, BRAND_B);
+  doc.roundedRect(marginLeft, y - 1, contentWidth, 9, 1.5, 1.5, "F");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.setTextColor(255, 255, 255);
+  doc.text("TERMS & REQUIREMENTS", marginLeft + 4, y + 5);
+  y += 14;
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8.5);
+  doc.setTextColor(60, 60, 60);
   const terms = [
     "The organizer shall provide a minimum of three (x3) microphones with three (x3) large microphone stands, along with one (x1) headset microphone and a functional sound system at the venue.",
     "Armless chairs must be arranged in accordance with the agreed number of drums confirmed prior to the event.",
@@ -177,45 +166,64 @@ function generateInvoicePDF(invoice: Invoice) {
 
   for (let i = 0; i < terms.length; i++) {
     const termText = `${i + 1}. ${terms[i]}`;
-    const lines = doc.splitTextToSize(termText, contentWidth);
+    const lines = doc.splitTextToSize(termText, contentWidth - 4);
     if (y + lines.length * 4 > 270) {
       doc.addPage();
-      y = 20;
+      doc.setFillColor(BRAND_R, BRAND_G, BRAND_B);
+      doc.rect(0, 0, pageWidth, 4, "F");
+      y = 16;
     }
-    doc.text(lines, marginLeft, y);
+    doc.text(lines, marginLeft + 4, y);
     y += lines.length * 4 + 3;
   }
 
-  y += 6;
-  if (y > 240) {
+  y += 8;
+  if (y > 230) {
     doc.addPage();
-    y = 20;
+    doc.setFillColor(BRAND_R, BRAND_G, BRAND_B);
+    doc.rect(0, 0, pageWidth, 4, "F");
+    y = 16;
   }
+
+  doc.setDrawColor(220, 220, 220);
+  doc.setLineWidth(0.3);
+  doc.line(marginLeft, y, rightEdge, y);
+  y += 8;
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(9);
-  doc.text("Please make all payments in the favor of", marginLeft, y);
-  y += 6;
+  doc.setTextColor(BRAND_R, BRAND_G, BRAND_B);
+  doc.text("PAYMENT DETAILS", marginLeft, y);
+  y += 7;
+
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8.5);
+  doc.setTextColor(60, 60, 60);
   const bankDetails = [
-    "Account Title: Haider Jamil",
-    "Account#: 01728593801",
-    "Bank Name: Standard Chartered Bank",
-    "IBAN: PK91SCBL0000001728593801",
-    "CNIC/NTN: 34603-6653341-7",
+    ["Account Title:", "Haider Jamil"],
+    ["Account #:", "01728593801"],
+    ["Bank:", "Standard Chartered Bank"],
+    ["IBAN:", "PK91SCBL0000001728593801"],
+    ["CNIC/NTN:", "34603-6653341-7"],
   ];
-  for (const line of bankDetails) {
-    doc.text(line, marginLeft, y);
-    y += 4.5;
+  for (const [label, value] of bankDetails) {
+    doc.setFont("helvetica", "bold");
+    doc.text(label, marginLeft + 4, y);
+    doc.setFont("helvetica", "normal");
+    doc.text(value, marginLeft + 30, y);
+    y += 5;
   }
 
-  y += 8;
+  y += 10;
+  doc.setFillColor(BRAND_R, BRAND_G, BRAND_B);
+  doc.rect(0, y, pageWidth, 18, "F");
+
+  doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
-  doc.setTextColor(100, 100, 100);
-  doc.text("For details call +923004598500 or email drumcirclepakistan@gmail.com", pageWidth / 2, y, { align: "center" });
-  y += 5;
-  doc.text("This document is system-generated and does not require manual authorization or signature.", pageWidth / 2, y, { align: "center" });
+  doc.setTextColor(255, 255, 255);
+  doc.text("+92 300 459 8500  |  drumcirclepakistan@gmail.com", pageWidth / 2, y + 7, { align: "center" });
+  doc.setFontSize(7);
+  doc.text("This document is system-generated and does not require manual authorization or signature.", pageWidth / 2, y + 13, { align: "center" });
 
   return doc;
 }
@@ -360,19 +368,6 @@ export default function InvoiceGeneratorPage() {
 
   const isPending = createMutation.isPending || updateMutation.isPending;
 
-  function getTaxDisplay(inv: Invoice) {
-    const amt = Number(inv.amount);
-    if (inv.taxMode === "inclusive") {
-      const preGst = Math.round(amt / (1 + TAX_RATE));
-      const gst = amt - preGst;
-      return `Rs ${amt.toLocaleString()} (incl. GST Rs ${gst.toLocaleString()})`;
-    } else {
-      const gst = Math.round(amt * TAX_RATE);
-      const total = amt + gst;
-      return `Rs ${amt.toLocaleString()} + GST Rs ${gst.toLocaleString()} = Rs ${total.toLocaleString()}`;
-    }
-  }
-
   return (
     <div className="p-4 md:p-6 max-w-4xl mx-auto space-y-6">
       <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -488,32 +483,12 @@ export default function InvoiceGeneratorPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="exclusive">Exclusive of GST</SelectItem>
-                    <SelectItem value="inclusive">Inclusive of GST</SelectItem>
+                    <SelectItem value="exclusive">Exclusive of Taxes</SelectItem>
+                    <SelectItem value="inclusive">Inclusive of Taxes</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
-
-            {amount && parseInt(amount) > 0 && (
-              <div className="text-xs text-muted-foreground p-2.5 rounded-md bg-muted/50">
-                {taxMode === "inclusive" ? (
-                  <>
-                    <span className="font-medium">Inclusive breakdown:</span>{" "}
-                    Amount before GST: Rs {Math.round(parseInt(amount) / (1 + TAX_RATE)).toLocaleString()}{" "}
-                    + GST (16%): Rs {(parseInt(amount) - Math.round(parseInt(amount) / (1 + TAX_RATE))).toLocaleString()}{" "}
-                    = Total: Rs {parseInt(amount).toLocaleString()}
-                  </>
-                ) : (
-                  <>
-                    <span className="font-medium">Exclusive breakdown:</span>{" "}
-                    Subtotal: Rs {parseInt(amount).toLocaleString()}{" "}
-                    + GST (16%): Rs {Math.round(parseInt(amount) * TAX_RATE).toLocaleString()}{" "}
-                    = Grand Total: Rs {(parseInt(amount) + Math.round(parseInt(amount) * TAX_RATE)).toLocaleString()}
-                  </>
-                )}
-              </div>
-            )}
 
             <div className="flex items-center gap-2 justify-end flex-wrap">
               <Button variant="outline" onClick={resetForm} data-testid="button-cancel-form">
@@ -608,7 +583,7 @@ export default function InvoiceGeneratorPage() {
                           {inv.type === "invoice" ? "Invoice" : "Quotation"}
                         </Badge>
                         <Badge variant="outline" className="text-[10px]">
-                          {inv.taxMode === "inclusive" ? "GST Inclusive" : "GST Exclusive"}
+                          {inv.taxMode === "inclusive" ? "Taxes Inclusive" : "Taxes Exclusive"}
                         </Badge>
                       </div>
                       <p className="text-sm mt-0.5" data-testid={`text-invoice-client-${inv.id}`}>
@@ -623,9 +598,6 @@ export default function InvoiceGeneratorPage() {
                           {inv.numberOfDrums} drums
                         </span>
                       </div>
-                      <p className="text-xs text-muted-foreground mt-0.5" data-testid={`text-invoice-tax-${inv.id}`}>
-                        {getTaxDisplay(inv)}
-                      </p>
                       <p className="text-xs text-muted-foreground mt-0.5">
                         Created: {format(new Date(inv.createdAt), "dd MMM yyyy")}
                       </p>
