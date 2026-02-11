@@ -2,6 +2,7 @@ services:
   - type: web
     name: fullstack-app
     env: node
+    plan: free  # <--- ADD THIS LINE
     buildCommand: npm install && npm run build
     startCommand: npm run db:push && npm run start
     envVars:
