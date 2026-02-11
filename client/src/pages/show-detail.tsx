@@ -35,7 +35,7 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { useState, useMemo } from "react";
-import type { Show, ShowExpense, ShowMember } from "@shared/schema";
+import { calculateDynamicPayout, type Show, type ShowExpense, type ShowMember, type PayoutConfig } from "@shared/schema";
 
 const statusColors: Record<string, string> = {
   upcoming: "default",
@@ -67,35 +67,7 @@ interface MemberFormRow {
   manualAmount: number;
 }
 
-interface MemberPayoutConfig {
-  referralRate?: number | null;
-  hasMinLogic?: boolean;
-  minThreshold?: number | null;
-  minFlatRate?: number | null;
-}
-
-function calculateDynamicPayout(
-  config: MemberPayoutConfig | undefined,
-  paymentValue: number,
-  isReferrer: boolean,
-  showTotal: number,
-  netAmount: number,
-  totalExpenses: number,
-  paymentType: string
-): number {
-  if (paymentType === "percentage") {
-    if (isReferrer && config?.referralRate) {
-      return Math.round((config.referralRate / 100) * netAmount);
-    }
-    if (config?.hasMinLogic && config.minThreshold && config.minFlatRate && showTotal < config.minThreshold) {
-      if (totalExpenses === 0) return config.minFlatRate;
-      const deduction = Math.round((paymentValue / 100) * totalExpenses);
-      return Math.max(0, config.minFlatRate - deduction);
-    }
-    return Math.round((paymentValue / 100) * netAmount);
-  }
-  return paymentValue;
-}
+type MemberPayoutConfig = PayoutConfig;
 
 export default function ShowDetail() {
   const { id } = useParams<{ id: string }>();

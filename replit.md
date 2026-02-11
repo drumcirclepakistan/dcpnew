@@ -50,6 +50,9 @@ A modern, mobile-friendly band management web app for Drum Circle Pakistan. Admi
 - Responsive sidebar navigation
 - **Live data**: Auto-refresh every 30s (15s for dashboard), refetch on window focus, staleTime 10s
 - **Pull-to-refresh**: Mobile touch pull-down gesture to refresh all active data
+- **In-app notifications**: Bell icon in header with unread count badge; notifications for show assignments (added/removed), member-created shows; mark individual or all as read
+- **Activity log**: Admin-only page tracking logins, show CRUD, paid/unpaid toggles, band member updates with timestamps
+- **Email notifications**: Uses Resend API for show assignment emails (requires RESEND_API_KEY secret)
 
 ## Member-Facing Interface
 - Members log in with accounts created by admin (Settings > Band Members > Create Account)
@@ -127,6 +130,11 @@ A modern, mobile-friendly band management web app for Drum Circle Pakistan. Admi
 - `PATCH /api/member/name` - Update member's own name (member, requires canEditName)
 - `POST /api/member/shows` - Create show as member (member, requires canAddShows)
 - `GET /api/member/policy` - Get member's payout policy/payment config (member)
+- `GET /api/notifications` - List user's notifications (authenticated)
+- `GET /api/notifications/unread-count` - Get unread notification count (authenticated)
+- `PATCH /api/notifications/:id/read` - Mark notification as read (authenticated)
+- `POST /api/notifications/mark-all-read` - Mark all notifications as read (authenticated)
+- `GET /api/activity-logs?limit=` - List activity logs (admin)
 
 ## User Preferences
 - Pakistani Rupees (Rs) for currency

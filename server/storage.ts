@@ -1,12 +1,16 @@
 import { eq } from "drizzle-orm";
 import { db } from "./db";
+import { desc } from "drizzle-orm";
 import {
   users, shows, showExpenses, showMembers, settings, bandMembers, showTypesTable,
+  notifications, activityLogs,
   type User, type InsertUser, type Show, type InsertShow,
   type ShowExpense, type InsertExpense,
   type ShowMember, type InsertMember,
   type Setting,
   type BandMember, type InsertBandMember,
+  type Notification, type InsertNotification,
+  type ActivityLog, type InsertActivityLog,
 } from "@shared/schema";
 import { scrypt, randomBytes } from "crypto";
 import { promisify } from "util";
@@ -61,6 +65,16 @@ export interface IStorage {
   getAllUsers(): Promise<User[]>;
   updateUser(id: string, data: Partial<{ password: string; displayName: string; role: string }>): Promise<User | undefined>;
   deleteUser(id: string): Promise<boolean>;
+
+  getNotifications(userId: string): Promise<Notification[]>;
+  getUnreadNotificationCount(userId: string): Promise<number>;
+  createNotification(notification: InsertNotification): Promise<Notification>;
+  markNotificationRead(id: string): Promise<void>;
+  markAllNotificationsRead(userId: string): Promise<void>;
+
+  createActivityLog(log: InsertActivityLog): Promise<ActivityLog>;
+  getActivityLogs(limit?: number, offset?: number): Promise<ActivityLog[]>;
+  getActivityLogCount(): Promise<number>;
 
   getShowTypes(userId: string): Promise<{ id: string; name: string; userId: string; showOrgField: boolean; showPublicField: boolean }[]>;
   getShowType(id: string): Promise<{ id: string; name: string; userId: string; showOrgField: boolean; showPublicField: boolean } | undefined>;
@@ -261,6 +275,42 @@ export class DatabaseStorage implements IStorage {
   async deleteShowType(id: string): Promise<boolean> {
     const result = await db.delete(showTypesTable).where(eq(showTypesTable.id, id)).returning();
     return result.length > 0;
+  }
+
+  async getNotifications(userId: string): Promise<Notification[]> {
+    return db.select().from(notifications).where(eq(notifications.userId, userId)).orderBy(desc(notifications.createdAt)).limit(50);
+  }
+
+  async getUnreadNotificationCount(userId: string): Promise<number> {
+    const rows = await db.select().from(notifications).where(eq(notifications.userId, userId));
+    return rows.filter(r => !r.isRead).length;
+  }
+
+  async createNotification(notification: InsertNotification): Promise<Notification> {
+    const [created] = await db.insert(notifications).values(notification).returning();
+    return created;
+  }
+
+  async markNotificationRead(id: string): Promise<void> {
+    await db.update(notifications).set({ isRead: true }).where(eq(notifications.id, id));
+  }
+
+  async markAllNotificationsRead(userId: string): Promise<void> {
+    await db.update(notifications).set({ isRead: true }).where(eq(notifications.userId, userId));
+  }
+
+  async createActivityLog(log: InsertActivityLog): Promise<ActivityLog> {
+    const [created] = await db.insert(activityLogs).values(log).returning();
+    return created;
+  }
+
+  async getActivityLogs(limit = 100, offset = 0): Promise<ActivityLog[]> {
+    return db.select().from(activityLogs).orderBy(desc(activityLogs.createdAt)).limit(limit).offset(offset);
+  }
+
+  async getActivityLogCount(): Promise<number> {
+    const rows = await db.select().from(activityLogs);
+    return rows.length;
   }
 }
 

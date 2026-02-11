@@ -26,7 +26,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { LayoutDashboard, CalendarPlus, ListMusic, LogOut, Drum, Settings, Wallet, BookOpen, Pencil, Loader2, FileText } from "lucide-react";
+import { LayoutDashboard, CalendarPlus, ListMusic, LogOut, Drum, Settings, Wallet, BookOpen, Pencil, Loader2, FileText, ScrollText } from "lucide-react";
 import { useMemo, useState } from "react";
 
 export function AppSidebar() {
@@ -69,6 +69,7 @@ export function AppSidebar() {
       { title: "Add Show", url: "/shows/new", icon: CalendarPlus },
       { title: "Directory", url: "/directory", icon: BookOpen },
       { title: "Financials", url: "/financials", icon: Wallet },
+      { title: "Activity Log", url: "/activity-log", icon: ScrollText },
       { title: "Settings", url: "/settings", icon: Settings },
     ];
   }, [isAdmin, isMember, user?.canAddShows]);

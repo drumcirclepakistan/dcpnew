@@ -9,6 +9,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PullToRefresh } from "@/components/pull-to-refresh";
+import { NotificationBell } from "@/components/notification-bell";
 import NotFound from "@/pages/not-found";
 import LoginPage from "@/pages/login";
 import Dashboard from "@/pages/dashboard";
@@ -19,6 +20,7 @@ import SettingsPage from "@/pages/settings";
 import FinancialsPage from "@/pages/financials";
 import DirectoryPage from "@/pages/directory";
 import PolicyPage from "@/pages/policy";
+import ActivityLogPage from "@/pages/activity-log";
 
 import { Redirect } from "wouter";
 
@@ -46,6 +48,7 @@ function Router() {
       <Route path="/financials" component={FinancialsPage} />
       <Route path="/policy">{() => <MemberOnly component={PolicyPage} />}</Route>
       <Route path="/settings">{() => <AdminOnly component={SettingsPage} />}</Route>
+      <Route path="/activity-log">{() => <AdminOnly component={ActivityLogPage} />}</Route>
       <Route component={NotFound} />
     </Switch>
   );
@@ -64,7 +67,10 @@ function AppLayout() {
         <div className="flex flex-col flex-1 min-w-0">
           <header className="flex items-center justify-between gap-2 p-2 border-b sticky top-0 z-50 bg-background">
             <SidebarTrigger data-testid="button-sidebar-toggle" />
-            <ThemeToggle />
+            <div className="flex items-center gap-1">
+              <NotificationBell />
+              <ThemeToggle />
+            </div>
           </header>
           <PullToRefresh>
             <Router />

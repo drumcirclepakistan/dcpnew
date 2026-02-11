@@ -176,3 +176,69 @@ export const settings = pgTable("settings", {
 export type Setting = typeof settings.$inferSelect;
 
 export const defaultSettings: Record<string, string> = {};
+
+export const notifications = pgTable("notifications", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  type: text("type").notNull(),
+  message: text("message").notNull(),
+  relatedShowId: varchar("related_show_id"),
+  relatedShowTitle: text("related_show_title"),
+  isRead: boolean("is_read").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const insertNotificationSchema = createInsertSchema(notifications).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertNotification = z.infer<typeof insertNotificationSchema>;
+export type Notification = typeof notifications.$inferSelect;
+
+export const activityLogs = pgTable("activity_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  userName: text("user_name").notNull(),
+  action: text("action").notNull(),
+  details: text("details"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const insertActivityLogSchema = createInsertSchema(activityLogs).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertActivityLog = z.infer<typeof insertActivityLogSchema>;
+export type ActivityLog = typeof activityLogs.$inferSelect;
+
+export interface PayoutConfig {
+  referralRate?: number | null;
+  hasMinLogic?: boolean;
+  minThreshold?: number | null;
+  minFlatRate?: number | null;
+}
+
+export function calculateDynamicPayout(
+  config: PayoutConfig | undefined,
+  paymentValue: number,
+  isReferrer: boolean,
+  showTotal: number,
+  netAmount: number,
+  totalExpenses: number,
+  paymentType: string
+): number {
+  if (paymentType === "percentage") {
+    if (isReferrer && config?.referralRate) {
+      return Math.round((config.referralRate / 100) * netAmount);
+    }
+    if (config?.hasMinLogic && config.minThreshold && config.minFlatRate && showTotal < config.minThreshold) {
+      if (totalExpenses === 0) return config.minFlatRate;
+      const deduction = Math.round((paymentValue / 100) * totalExpenses);
+      return Math.max(0, config.minFlatRate - deduction);
+    }
+    return Math.round((paymentValue / 100) * netAmount);
+  }
+  return paymentValue;
+}

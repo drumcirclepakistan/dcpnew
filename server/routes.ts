@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import { storage } from "./storage";
-import { insertShowSchema, insertExpenseSchema, insertMemberSchema, defaultSettings } from "@shared/schema";
+import { insertShowSchema, insertExpenseSchema, insertMemberSchema, defaultSettings, calculateDynamicPayout } from "@shared/schema";
 import { seedDatabase } from "./seed";
 import { sendBulkShowAssignment, isEmailConfigured } from "./email";
 
@@ -184,7 +184,43 @@ export async function registerRoutes(
     )
   `);
 
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS notifications (
+      id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id VARCHAR NOT NULL,
+      type TEXT NOT NULL,
+      message TEXT NOT NULL,
+      related_show_id VARCHAR,
+      related_show_title TEXT,
+      is_read BOOLEAN NOT NULL DEFAULT false,
+      created_at TIMESTAMP NOT NULL DEFAULT now()
+    )
+  `);
+
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS activity_logs (
+      id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id VARCHAR NOT NULL,
+      user_name TEXT NOT NULL,
+      action TEXT NOT NULL,
+      details TEXT,
+      created_at TIMESTAMP NOT NULL DEFAULT now()
+    )
+  `);
+
   await seedDatabase();
+
+  async function logActivity(userId: string, userName: string, action: string, details?: string) {
+    try {
+      await storage.createActivityLog({ userId, userName, action, details: details || null });
+    } catch (e) {}
+  }
+
+  async function notifyUser(userId: string, type: string, message: string, showId?: string, showTitle?: string) {
+    try {
+      await storage.createNotification({ userId, type, message, relatedShowId: showId || null, relatedShowTitle: showTitle || null, isRead: false });
+    } catch (e) {}
+  }
 
   // Auth routes
   app.post("/api/auth/login", async (req, res) => {
@@ -202,6 +238,7 @@ export async function registerRoutes(
         return res.status(401).json({ message: "Invalid credentials" });
       }
       req.session.userId = user.id;
+      logActivity(user.id, user.displayName, "login", `${user.displayName} logged in`);
       const { password: _, ...safeUser } = user;
       if (user.role === "member") {
         const bandMember = await storage.getBandMemberByUserId(user.id);
@@ -304,6 +341,8 @@ export async function registerRoutes(
         ...parsed,
         userId: req.session.userId!,
       });
+      const user = await storage.getUser(req.session.userId!);
+      logActivity(req.session.userId!, user?.displayName || "Admin", "show_created", `Created "${show.title}" in ${show.city}`);
       res.status(201).json(show);
     } catch (err: any) {
       res.status(400).json({ message: err.message || "Invalid show data" });
@@ -329,6 +368,8 @@ export async function registerRoutes(
     if (!existing || existing.userId !== req.session.userId) {
       return res.status(404).json({ message: "Show not found" });
     }
+    const user = await storage.getUser(req.session.userId!);
+    logActivity(req.session.userId!, user?.displayName || "Admin", "show_deleted", `Deleted "${existing.title}" in ${existing.city}`);
     await storage.deleteShow(req.params.id as string);
     res.json({ message: "Deleted" });
   });
@@ -418,19 +459,41 @@ export async function registerRoutes(
         created.push(member);
       }
 
-      if (isEmailConfigured()) {
-        const bandMembers = await storage.getBandMembers();
-        const bandEmailMap: Record<string, string> = {};
-        for (const bm of bandMembers) {
-          if (bm.email) bandEmailMap[bm.name] = bm.email;
-        }
+      const allBandMembers = await storage.getBandMembers();
+      const bandEmailMap: Record<string, string> = {};
+      const bandUserIdMap: Record<string, string> = {};
+      for (const bm of allBandMembers) {
+        if (bm.email) bandEmailMap[bm.name] = bm.email;
+        if (bm.userId) bandUserIdMap[bm.name] = bm.userId;
+      }
 
-        const newMembers = created
+      const newMemberNames = created.filter(m => !existingNames.has(m.name)).map(m => m.name);
+      const removedMemberNames = [...existingNames].filter(n => !created.find(c => c.name === n));
+      const adminUser = await storage.getUser(req.session.userId!);
+      const adminName = adminUser?.displayName || "Admin";
+
+      for (const name of newMemberNames) {
+        if (bandUserIdMap[name]) {
+          notifyUser(bandUserIdMap[name], "added_to_show", `${adminName} added you to "${show.title}"`, show.id, show.title);
+        }
+      }
+      for (const name of removedMemberNames) {
+        if (bandUserIdMap[name]) {
+          notifyUser(bandUserIdMap[name], "removed_from_show", `${adminName} removed you from "${show.title}"`, show.id, show.title);
+        }
+      }
+
+      if (newMemberNames.length > 0) {
+        logActivity(req.session.userId!, adminName, "members_updated", `Updated band for "${show.title}" — added: ${newMemberNames.join(", ")}${removedMemberNames.length ? `, removed: ${removedMemberNames.join(", ")}` : ""}`);
+      }
+
+      if (isEmailConfigured()) {
+        const emailMembers = created
           .filter(m => !existingNames.has(m.name) && bandEmailMap[m.name])
           .map(m => ({ email: bandEmailMap[m.name], name: m.name }));
 
-        if (newMembers.length > 0) {
-          sendBulkShowAssignment(newMembers, {
+        if (emailMembers.length > 0) {
+          sendBulkShowAssignment(emailMembers, {
             showTitle: show.title,
             showDate: show.showDate.toISOString(),
             city: show.city,
@@ -454,9 +517,14 @@ export async function registerRoutes(
       if (!existing || existing.userId !== req.session.userId) {
         return res.status(404).json({ message: "Show not found" });
       }
-      const updated = await storage.updateShow(req.params.id as string, {
-        isPaid: !existing.isPaid,
-      } as any);
+      const newPaid = !existing.isPaid;
+      const updateData: any = { isPaid: newPaid };
+      if (newPaid && existing.advancePayment === 0) {
+        updateData.advancePayment = existing.totalAmount;
+      }
+      const updated = await storage.updateShow(req.params.id as string, updateData);
+      const user = await storage.getUser(req.session.userId!);
+      logActivity(req.session.userId!, user?.displayName || "Admin", newPaid ? "show_marked_paid" : "show_marked_unpaid", `${existing.title}`);
       res.json(updated);
     } catch (err: any) {
       res.status(400).json({ message: err.message || "Update failed" });
@@ -953,19 +1021,33 @@ export async function registerRoutes(
 
       const show = await storage.createShow({ ...parsed.data, userId: founderUser.id });
 
+      const paymentValue = member.normalRate ?? 0;
+      const paymentType = member.paymentType === "percentage" ? "percentage" : "fixed";
+      const config = {
+        referralRate: member.referralRate,
+        hasMinLogic: member.hasMinLogic,
+        minThreshold: member.minThreshold,
+        minFlatRate: member.minFlatRate,
+      };
+      const calcAmount = calculateDynamicPayout(config, paymentValue, true, show.totalAmount, show.totalAmount, 0, paymentType);
+
       await storage.createMember({
         showId: show.id,
         name: member.name,
         role: member.role === "manager" ? "manager" : "session_player",
-        paymentType: member.paymentType === "percentage" ? "percentage" : "fixed",
-        paymentValue: member.normalRate ?? 0,
+        paymentType,
+        paymentValue,
         isReferrer: true,
-        calculatedAmount: 0,
+        calculatedAmount: calcAmount,
         referralRate: member.referralRate ?? null,
         hasMinLogic: member.hasMinLogic ?? false,
         minThreshold: member.minThreshold ?? null,
         minFlatRate: member.minFlatRate ?? null,
       });
+
+      const user = await storage.getUser(req.session.userId!);
+      logActivity(req.session.userId!, user?.displayName || member.name, "show_created", `${member.name} added show "${show.title}" for ${show.city}`);
+      notifyUser(founderUser.id, "member_created_show", `${member.name} added a new show "${show.title}" on ${new Date(show.showDate).toLocaleDateString("en-PK", { year: "numeric", month: "short", day: "numeric" })}`, show.id, show.title);
 
       res.json(show);
     } catch (err: any) {
@@ -1220,6 +1302,54 @@ export async function registerRoutes(
     const deleted = await storage.deleteShowType(req.params.id as string);
     if (!deleted) return res.status(404).json({ message: "Show type not found" });
     res.json({ message: "Show type deleted" });
+  });
+
+  // Notifications API (authenticated)
+  app.get("/api/notifications", requireAuth, async (req, res) => {
+    try {
+      const notifications = await storage.getNotifications(req.session.userId!);
+      res.json(notifications);
+    } catch (err: any) {
+      res.status(500).json({ message: "Failed to fetch notifications" });
+    }
+  });
+
+  app.get("/api/notifications/unread-count", requireAuth, async (req, res) => {
+    try {
+      const count = await storage.getUnreadNotificationCount(req.session.userId!);
+      res.json({ count });
+    } catch (err: any) {
+      res.status(500).json({ message: "Failed to fetch count" });
+    }
+  });
+
+  app.patch("/api/notifications/:id/read", requireAuth, async (req, res) => {
+    try {
+      await storage.markNotificationRead(req.params.id as string);
+      res.json({ message: "Marked as read" });
+    } catch (err: any) {
+      res.status(500).json({ message: "Failed to mark as read" });
+    }
+  });
+
+  app.post("/api/notifications/mark-all-read", requireAuth, async (req, res) => {
+    try {
+      await storage.markAllNotificationsRead(req.session.userId!);
+      res.json({ message: "All marked as read" });
+    } catch (err: any) {
+      res.status(500).json({ message: "Failed to mark all as read" });
+    }
+  });
+
+  // Activity Log API (admin only)
+  app.get("/api/activity-logs", requireAdmin, async (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 50;
+      const logs = await storage.getActivityLogs(limit);
+      res.json(logs);
+    } catch (err: any) {
+      res.status(500).json({ message: "Failed to fetch activity logs" });
+    }
   });
 
   return httpServer;
