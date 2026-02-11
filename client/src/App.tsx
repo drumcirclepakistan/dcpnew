@@ -22,6 +22,7 @@ import DirectoryPage from "@/pages/directory";
 import PolicyPage from "@/pages/policy";
 import ActivityLogPage from "@/pages/activity-log";
 import MemberSettingsPage from "@/pages/member-settings";
+import InvoiceGeneratorPage from "@/pages/invoice-generator";
 
 import { Redirect } from "wouter";
 
@@ -50,6 +51,7 @@ function Router() {
       <Route path="/policy">{() => <MemberOnly component={PolicyPage} />}</Route>
       <Route path="/settings">{() => <AdminOnly component={SettingsPage} />}</Route>
       <Route path="/account" component={MemberSettingsPage} />
+      <Route path="/invoices">{() => <AdminOnly component={InvoiceGeneratorPage} />}</Route>
       <Route path="/activity-log">{() => <AdminOnly component={ActivityLogPage} />}</Route>
       <Route component={NotFound} />
     </Switch>

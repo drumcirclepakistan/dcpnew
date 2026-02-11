@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { LayoutDashboard, CalendarPlus, ListMusic, LogOut, Drum, Settings, Wallet, BookOpen, FileText, ScrollText, UserCog } from "lucide-react";
+import { LayoutDashboard, CalendarPlus, ListMusic, LogOut, Drum, Settings, Wallet, BookOpen, FileText, ScrollText, UserCog, Receipt } from "lucide-react";
 import { useMemo } from "react";
 
 export function AppSidebar() {
@@ -43,6 +43,7 @@ export function AppSidebar() {
       { title: "Add Show", url: "/shows/new", icon: CalendarPlus },
       { title: "Directory", url: "/directory", icon: BookOpen },
       { title: "Financials", url: "/financials", icon: Wallet },
+      { title: "Invoice Generator", url: "/invoices", icon: Receipt },
       { title: "Activity Log", url: "/activity-log", icon: ScrollText },
       { title: "Settings", url: "/settings", icon: Settings },
       { title: "Account", url: "/account", icon: UserCog },

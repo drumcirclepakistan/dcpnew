@@ -245,6 +245,36 @@ export interface PayoutConfig {
   minFlatRate?: number | null;
 }
 
+export const invoiceTypeEnum = pgEnum("invoice_type", ["invoice", "quotation"]);
+export const taxModeEnum = pgEnum("tax_mode", ["inclusive", "exclusive"]);
+
+export const invoices = pgTable("invoices", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  type: invoiceTypeEnum("type").notNull(),
+  number: integer("number").notNull(),
+  displayNumber: text("display_number").notNull(),
+  billTo: text("bill_to").notNull(),
+  city: text("city").notNull(),
+  numberOfDrums: integer("number_of_drums").notNull(),
+  duration: text("duration").notNull(),
+  eventDate: timestamp("event_date").notNull(),
+  amount: integer("amount").notNull(),
+  taxMode: taxModeEnum("tax_mode").notNull().default("exclusive"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+  userId: varchar("user_id").notNull(),
+});
+
+export const insertInvoiceSchema = createInsertSchema(invoices).omit({
+  id: true,
+  createdAt: true,
+  userId: true,
+  number: true,
+  displayNumber: true,
+});
+
+export type InsertInvoice = z.infer<typeof insertInvoiceSchema>;
+export type Invoice = typeof invoices.$inferSelect;
+
 export function calculateDynamicPayout(
   config: PayoutConfig | undefined,
   paymentValue: number,

@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import { storage } from "./storage";
-import { insertShowSchema, insertExpenseSchema, insertMemberSchema, defaultSettings, calculateDynamicPayout } from "@shared/schema";
+import { insertShowSchema, insertExpenseSchema, insertMemberSchema, insertInvoiceSchema, defaultSettings, calculateDynamicPayout } from "@shared/schema";
 import { seedDatabase } from "./seed";
 import { sendBulkShowAssignment, isEmailConfigured } from "./email";
 
@@ -206,6 +206,38 @@ export async function registerRoutes(
       action TEXT NOT NULL,
       details TEXT,
       created_at TIMESTAMP NOT NULL DEFAULT now()
+    )
+  `);
+
+  await db.execute(sql`
+    DO $$ BEGIN
+      CREATE TYPE invoice_type AS ENUM ('invoice', 'quotation');
+    EXCEPTION WHEN duplicate_object THEN null;
+    END $$
+  `);
+
+  await db.execute(sql`
+    DO $$ BEGIN
+      CREATE TYPE tax_mode AS ENUM ('inclusive', 'exclusive');
+    EXCEPTION WHEN duplicate_object THEN null;
+    END $$
+  `);
+
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS invoices (
+      id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+      type invoice_type NOT NULL,
+      number INTEGER NOT NULL,
+      display_number TEXT NOT NULL,
+      bill_to TEXT NOT NULL,
+      city TEXT NOT NULL,
+      number_of_drums INTEGER NOT NULL,
+      duration TEXT NOT NULL,
+      event_date TIMESTAMP NOT NULL,
+      amount INTEGER NOT NULL,
+      tax_mode tax_mode NOT NULL DEFAULT 'exclusive',
+      created_at TIMESTAMP NOT NULL DEFAULT now(),
+      user_id VARCHAR NOT NULL
     )
   `);
 
@@ -1741,6 +1773,87 @@ export async function registerRoutes(
       res.json(logs);
     } catch (err: any) {
       res.status(500).json({ message: "Failed to fetch activity logs" });
+    }
+  });
+
+  // Invoice/Quotation routes (admin only)
+  app.get("/api/invoices", requireAdmin, async (req, res) => {
+    try {
+      const allInvoices = await storage.getInvoices(req.session.userId!);
+      const { search, from, to, type } = req.query as { search?: string; from?: string; to?: string; type?: string };
+
+      let filtered = allInvoices;
+      if (type && (type === "invoice" || type === "quotation")) {
+        filtered = filtered.filter(inv => inv.type === type);
+      }
+      if (from) {
+        const fromDate = new Date(from);
+        filtered = filtered.filter(inv => new Date(inv.eventDate) >= fromDate);
+      }
+      if (to) {
+        const toDate = new Date(to);
+        filtered = filtered.filter(inv => new Date(inv.eventDate) <= toDate);
+      }
+      if (search) {
+        const q = search.toLowerCase();
+        filtered = filtered.filter(inv =>
+          inv.billTo.toLowerCase().includes(q) ||
+          inv.city.toLowerCase().includes(q) ||
+          inv.displayNumber.toLowerCase().includes(q)
+        );
+      }
+      res.json(filtered);
+    } catch (err: any) {
+      res.status(500).json({ message: "Failed to fetch invoices" });
+    }
+  });
+
+  app.post("/api/invoices", requireAdmin, async (req, res) => {
+    try {
+      const parsed = insertInvoiceSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid data", errors: parsed.error.errors });
+      }
+      const { type, billTo, city, numberOfDrums, duration, eventDate, amount, taxMode } = parsed.data;
+      const nextNumber = await storage.getNextInvoiceNumber();
+      const displayNumber = `DCP-${nextNumber}`;
+      const invoice = await storage.createInvoice({
+        type,
+        billTo,
+        city,
+        numberOfDrums,
+        duration,
+        eventDate: new Date(eventDate),
+        amount,
+        taxMode: taxMode || "exclusive",
+        number: nextNumber,
+        displayNumber,
+        userId: req.session.userId!,
+      });
+
+      const user = await storage.getUser(req.session.userId!);
+      await logActivity(req.session.userId!, user?.displayName || "Admin", `Created ${type}`, `${displayNumber} for ${billTo}`);
+
+      res.json(invoice);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Failed to create invoice" });
+    }
+  });
+
+  app.delete("/api/invoices/:id", requireAdmin, async (req, res) => {
+    try {
+      const invoiceId = req.params.id as string;
+      const invoice = await storage.getInvoice(invoiceId);
+      if (!invoice) return res.status(404).json({ message: "Not found" });
+
+      await storage.deleteInvoice(invoiceId);
+
+      const user = await storage.getUser(req.session.userId!);
+      await logActivity(req.session.userId!, user?.displayName || "Admin", `Deleted ${invoice.type}`, `${invoice.displayNumber} for ${invoice.billTo}`);
+
+      res.json({ message: "Deleted" });
+    } catch (err: any) {
+      res.status(500).json({ message: "Failed to delete" });
     }
   });
 

@@ -3,7 +3,7 @@ import { db } from "./db";
 import { desc } from "drizzle-orm";
 import {
   users, shows, showExpenses, showMembers, settings, bandMembers, showTypesTable,
-  notifications, activityLogs, retainedFundAllocations,
+  notifications, activityLogs, retainedFundAllocations, invoices,
   type User, type InsertUser, type Show, type InsertShow,
   type ShowExpense, type InsertExpense,
   type ShowMember, type InsertMember,
@@ -12,6 +12,7 @@ import {
   type Notification, type InsertNotification,
   type ActivityLog, type InsertActivityLog,
   type RetainedFundAllocation, type InsertRetainedFundAllocation,
+  type Invoice, type InsertInvoice,
 } from "@shared/schema";
 import { scrypt, randomBytes } from "crypto";
 import { promisify } from "util";
@@ -88,6 +89,12 @@ export interface IStorage {
   updateShowType(id: string, name: string, showOrgField?: boolean, showPublicField?: boolean): Promise<{ id: string; name: string; userId: string; showOrgField: boolean; showPublicField: boolean } | undefined>;
   renameShowTypeInShows(oldName: string, newName: string): Promise<void>;
   deleteShowType(id: string): Promise<boolean>;
+
+  getInvoices(userId: string): Promise<Invoice[]>;
+  getInvoice(id: string): Promise<Invoice | undefined>;
+  getNextInvoiceNumber(): Promise<number>;
+  createInvoice(invoice: InsertInvoice & { userId: string; number: number; displayNumber: string }): Promise<Invoice>;
+  deleteInvoice(id: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -336,6 +343,31 @@ export class DatabaseStorage implements IStorage {
   async getActivityLogCount(): Promise<number> {
     const rows = await db.select().from(activityLogs);
     return rows.length;
+  }
+
+  async getInvoices(userId: string): Promise<Invoice[]> {
+    return db.select().from(invoices).where(eq(invoices.userId, userId)).orderBy(desc(invoices.createdAt));
+  }
+
+  async getInvoice(id: string): Promise<Invoice | undefined> {
+    const [invoice] = await db.select().from(invoices).where(eq(invoices.id, id));
+    return invoice;
+  }
+
+  async getNextInvoiceNumber(): Promise<number> {
+    const rows = await db.select({ number: invoices.number }).from(invoices).orderBy(desc(invoices.number)).limit(1);
+    if (rows.length === 0) return 4848;
+    return rows[0].number + 1;
+  }
+
+  async createInvoice(invoice: InsertInvoice & { userId: string; number: number; displayNumber: string }): Promise<Invoice> {
+    const [created] = await db.insert(invoices).values(invoice).returning();
+    return created;
+  }
+
+  async deleteInvoice(id: string): Promise<boolean> {
+    const result = await db.delete(invoices).where(eq(invoices.id, id)).returning();
+    return result.length > 0;
   }
 }
 

@@ -13,7 +13,7 @@ A modern, mobile-friendly band management web app for Drum Circle Pakistan. Admi
 ## Key Features
 - Session-based login (admin account: username `founder`, password `drumcircle2024`)
 - Dashboard with time range filtering (Lifetime, This Year, Last Year, This/Last Month, Last 3/6 Months, Custom)
-- Dashboard stats: Total Shows, Total Revenue, Revenue After Expenses, My Earnings, Cancelled Show Amount (retained advance from cancelled shows), Upcoming Shows, Pending Payments, No Advance Received (warning)
+- Dashboard stats: Shows Performed, Total Revenue, Revenue After Expenses, My Earnings (from paid completed shows + unallocated cancelled funds), Cancelled Show Amount (retained advance from cancelled shows), Upcoming Shows, Pending Payments, No Advance Received (warning)
 - Dashboard insights: Top Cities, Top Show Types (filtered by time range)
 - Upcoming count and pending payments always show full data regardless of time range
 - Full show CRUD (add, view, edit, delete)
@@ -56,6 +56,7 @@ A modern, mobile-friendly band management web app for Drum Circle Pakistan. Admi
 - **In-app notifications**: Bell icon in header with unread count badge; notifications for show assignments (added/removed), member-created shows; mark individual or all as read
 - **Activity log**: Admin-only page tracking logins, show CRUD, paid/unpaid toggles, band member updates with timestamps
 - **Email notifications**: Uses Resend API for show assignment emails (requires RESEND_API_KEY secret)
+- **Invoice Generator**: Admin-only system for creating invoices/quotations with client-side PDF generation (jsPDF); auto-incrementing numbers starting from DCP-4848; form with type/billTo/city/drums/duration/eventDate/amount/taxMode; list with search/filter/download/delete; PDF includes terms & bank details
 
 ## Member-Facing Interface
 - Members log in with accounts created by admin (Settings > Band Members > Create Account)
