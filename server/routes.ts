@@ -244,6 +244,7 @@ export async function registerRoutes(
     )
   `);
   await db.execute(sql`ALTER TABLE invoices ADD COLUMN IF NOT EXISTS shared_with_member_id VARCHAR`);
+  await db.execute(sql`ALTER TABLE invoices ADD COLUMN IF NOT EXISTS created_by_member_name TEXT`);
 
   await seedDatabase();
 
@@ -1850,6 +1851,7 @@ export async function registerRoutes(
         displayNumber,
         userId: req.session.userId!,
         sharedWithMemberId: null,
+        createdByMemberName: member.name,
       });
 
       const user = await storage.getUser(req.session.userId!);
@@ -1991,6 +1993,8 @@ export async function registerRoutes(
         number: nextNumber,
         displayNumber,
         userId: req.session.userId!,
+        sharedWithMemberId: null,
+        createdByMemberName: null,
       });
 
       const user = await storage.getUser(req.session.userId!);
@@ -2039,6 +2043,18 @@ export async function registerRoutes(
       const updated = await storage.updateInvoice(invoiceId, updateData);
       const user = await storage.getUser(req.session.userId!);
       await logActivity(req.session.userId!, user?.displayName || "Admin", `Updated ${updated?.type || existing.type}`, `${existing.displayNumber} for ${updated?.billTo || existing.billTo}`);
+
+      if (req.body.sharedWithMemberId && req.body.sharedWithMemberId !== existing.sharedWithMemberId) {
+        const sharedMember = await storage.getBandMember(req.body.sharedWithMemberId);
+        if (sharedMember?.userId) {
+          const typeLabel = existing.type === "invoice" ? "invoice" : "quotation";
+          await notifyUser(
+            sharedMember.userId,
+            "invoice_shared",
+            `An ${typeLabel} (${existing.displayNumber}) for "${existing.billTo}" has been shared with you`
+          );
+        }
+      }
 
       res.json(updated);
     } catch (err: any) {

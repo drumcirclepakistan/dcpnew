@@ -283,12 +283,25 @@ export default function SettingsPage() {
   const updateRoleMutation = useMutation({
     mutationFn: ({ id, ...data }: { id: string; name?: string; role?: string; customRole?: string | null; canAddShows?: boolean; canEditName?: boolean; canViewAmounts?: boolean; canShowContacts?: boolean; canGenerateInvoice?: boolean; email?: string | null }) =>
       apiRequest("PATCH", `/api/band-members/${id}`, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/band-members"] });
-      toast({ title: "Updated" });
+    onMutate: async (variables) => {
+      await queryClient.cancelQueries({ queryKey: ["/api/band-members"] });
+      const previous = queryClient.getQueryData<BandMember[]>(["/api/band-members"]);
+      if (previous) {
+        const { id, ...updates } = variables;
+        queryClient.setQueryData<BandMember[]>(["/api/band-members"], (old) =>
+          old?.map((m) => m.id === id ? { ...m, ...updates } : m) ?? []
+        );
+      }
+      return { previous };
     },
-    onError: (err: Error) => {
+    onError: (err: Error, _vars, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(["/api/band-members"], context.previous);
+      }
       toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/band-members"] });
     },
   });
 

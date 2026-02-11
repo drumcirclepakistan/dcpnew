@@ -280,6 +280,7 @@ export const invoices = pgTable("invoices", {
   taxMode: taxModeEnum("tax_mode").notNull().default("exclusive"),
   items: text("items"),
   sharedWithMemberId: varchar("shared_with_member_id"),
+  createdByMemberName: text("created_by_member_name"),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
   userId: varchar("user_id").notNull(),
 });

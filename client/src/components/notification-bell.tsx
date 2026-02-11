@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useLocation } from "wouter";
 import { Bell, Check, CheckCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -17,8 +18,15 @@ interface Notification {
   createdAt: string;
 }
 
+function getNotificationLink(n: Notification): string | null {
+  if (n.type === "invoice_shared") return "/invoices";
+  if (n.relatedShowId) return "/shows";
+  return null;
+}
+
 export function NotificationBell() {
   const [open, setOpen] = useState(false);
+  const [, setLocation] = useLocation();
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const { data: countData } = useQuery<{ count: number }>({
@@ -99,31 +107,41 @@ export function NotificationBell() {
             <div className="p-4 text-center text-sm text-muted-foreground">No notifications</div>
           ) : (
             <div>
-              {notifications.map((n) => (
-                <div
-                  key={n.id}
-                  className={`flex items-start gap-2 p-3 border-b last:border-b-0 ${!n.isRead ? "bg-muted/50" : ""}`}
-                  data-testid={`notification-item-${n.id}`}
-                >
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm leading-snug">{n.message}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {formatDistanceToNow(new Date(n.createdAt), { addSuffix: true })}
-                    </p>
+              {notifications.map((n) => {
+                const link = getNotificationLink(n);
+                return (
+                  <div
+                    key={n.id}
+                    className={`flex items-start gap-2 p-3 border-b last:border-b-0 ${!n.isRead ? "bg-muted/50" : ""} ${link ? "cursor-pointer hover-elevate" : ""}`}
+                    data-testid={`notification-item-${n.id}`}
+                    onClick={() => {
+                      if (link) {
+                        if (!n.isRead) markReadMutation.mutate(n.id);
+                        setOpen(false);
+                        setLocation(link);
+                      }
+                    }}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm leading-snug">{n.message}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {formatDistanceToNow(new Date(n.createdAt), { addSuffix: true })}
+                      </p>
+                    </div>
+                    {!n.isRead && (
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="flex-shrink-0"
+                        onClick={(e) => { e.stopPropagation(); markReadMutation.mutate(n.id); }}
+                        data-testid={`button-mark-read-${n.id}`}
+                      >
+                        <Check className="w-3.5 h-3.5" />
+                      </Button>
+                    )}
                   </div>
-                  {!n.isRead && (
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="flex-shrink-0"
-                      onClick={() => markReadMutation.mutate(n.id)}
-                      data-testid={`button-mark-read-${n.id}`}
-                    >
-                      <Check className="w-3.5 h-3.5" />
-                    </Button>
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

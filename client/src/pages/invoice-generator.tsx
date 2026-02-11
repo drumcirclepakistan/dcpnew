@@ -39,6 +39,7 @@ import {
   X,
   Share2,
   Eye,
+  User,
 } from "lucide-react";
 import { format } from "date-fns";
 import type { Invoice, InvoiceItem, BandMember } from "@shared/schema";
@@ -327,7 +328,9 @@ export default function InvoiceGeneratorPage() {
     onSuccess: (invoice: Invoice) => {
       queryClient.invalidateQueries({ queryKey: [apiBase] });
       toast({ title: `${invoice.type === "invoice" ? "Invoice" : "Quotation"} created`, description: invoice.displayNumber });
-      downloadInvoicePDF(invoice);
+      if (isAdmin) {
+        downloadInvoicePDF(invoice);
+      }
       resetForm();
     },
     onError: (err: any) => {
@@ -660,7 +663,7 @@ export default function InvoiceGeneratorPage() {
                   ? (editingInvoice ? "Saving..." : "Generating...")
                   : editingInvoice
                     ? "Save Changes"
-                    : "Generate & Download"}
+                    : isAdmin ? "Generate & Download" : "Generate"}
               </Button>
             </div>
           </CardContent>
@@ -742,6 +745,12 @@ export default function InvoiceGeneratorPage() {
                           {items.length > 1 && (
                             <Badge variant="outline" className="text-[10px]">
                               {items.length} shows
+                            </Badge>
+                          )}
+                          {inv.createdByMemberName && (
+                            <Badge variant="outline" className="text-[10px]" data-testid={`badge-made-by-${inv.id}`}>
+                              <User className="w-3 h-3 mr-0.5" />
+                              Made by {inv.createdByMemberName}
                             </Badge>
                           )}
                           {isSharedWithMe && (
