@@ -759,7 +759,20 @@ export async function registerRoutes(
 
       const totalRevenue = filteredShows.reduce((s, sh) => s + sh.totalAmount, 0);
       const revenueAfterExpenses = totalRevenue - totalExpenses;
-      const founderRevenue = revenueAfterExpenses - totalMemberPayouts;
+
+      const paidCompletedShows = filteredShows.filter(s => s.status === "completed" && s.isPaid);
+      let paidShowExpenses = 0;
+      let paidShowMemberPayouts = 0;
+      for (const show of paidCompletedShows) {
+        const expenses = await storage.getShowExpenses(show.id);
+        paidShowExpenses += expenses.reduce((s, e) => s + e.amount, 0);
+        const members = await storage.getShowMembers(show.id);
+        for (const m of members) {
+          paidShowMemberPayouts += m.calculatedAmount;
+        }
+      }
+      const paidShowRevenue = paidCompletedShows.reduce((s, sh) => s + sh.totalAmount, 0);
+      const founderEarningsFromPaidShows = paidShowRevenue - paidShowExpenses - paidShowMemberPayouts;
 
       const completedFilteredShows = filteredShows.filter((s) => s.status === "completed");
       const cityCount: Record<string, number> = {};
@@ -814,12 +827,17 @@ export async function registerRoutes(
       }
       const cancelledUnallocated = Math.max(0, cancelledShowAmount - cancelledAllocated);
 
+      const founderCancelledEarnings = cancelledUnallocated;
+      const founderTotalEarnings = founderEarningsFromPaidShows + founderCancelledEarnings;
+
       res.json({
         totalShows: filteredShows.length,
         totalRevenue,
         totalExpenses,
         revenueAfterExpenses,
-        founderRevenue,
+        founderEarningsFromPaidShows,
+        founderCancelledEarnings,
+        founderTotalEarnings,
         cancelledShowAmount,
         cancelledAllocated,
         cancelledUnallocated,

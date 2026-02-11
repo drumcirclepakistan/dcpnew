@@ -36,7 +36,9 @@ interface DashboardStats {
   totalRevenue: number;
   totalExpenses: number;
   revenueAfterExpenses: number;
-  founderRevenue: number;
+  founderEarningsFromPaidShows: number;
+  founderCancelledEarnings: number;
+  founderTotalEarnings: number;
   cancelledShowAmount: number;
   cancelledAllocated?: number;
   cancelledUnallocated?: number;
@@ -594,10 +596,15 @@ export default function Dashboard() {
                 />
                 <StatCard
                   label="My Earnings"
-                  value={`Rs ${(adminStats?.founderRevenue || 0).toLocaleString()}`}
+                  value={`Rs ${(adminStats?.founderTotalEarnings || 0).toLocaleString()}`}
                   icon={Crown}
                   testId="stat-founder-revenue"
                   variant="highlight"
+                  subtitle={
+                    (adminStats?.founderCancelledEarnings || 0) > 0
+                      ? `Rs ${(adminStats?.founderEarningsFromPaidShows || 0).toLocaleString()} from paid shows + Rs ${(adminStats?.founderCancelledEarnings || 0).toLocaleString()} from cancelled (unallocated)`
+                      : `From ${adminStats?.totalShows ? 'paid completed' : '0'} shows`
+                  }
                 />
                 {(adminStats?.cancelledShowAmount || 0) > 0 && (
                   <StatCard
