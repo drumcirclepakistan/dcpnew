@@ -632,17 +632,22 @@ export async function registerRoutes(
         const toDate = new Date(to as string);
         cancelledShows = cancelledShows.filter((s) => new Date(s.showDate) <= toDate);
       }
-      const cancelledShowAmount = cancelledShows.reduce((sum, s) => {
-        const retained = s.advancePayment - (s.refundAmount || 0);
-        return sum + Math.max(0, retained);
-      }, 0);
+      let cancelledShowAmount = 0;
+      for (const cs of cancelledShows) {
+        const csExpenses = await storage.getShowExpenses(cs.id);
+        const csExpenseTotal = csExpenses.reduce((s, e) => s + e.amount, 0);
+        const fundsReceived = cs.isPaid ? cs.totalAmount : cs.advancePayment;
+        const afterExpenses = Math.max(0, fundsReceived - csExpenseTotal);
+        const retained = Math.max(0, afterExpenses - (cs.refundAmount || 0));
+        cancelledShowAmount += retained;
+      }
 
       res.json({
         totalShows: filteredShows.length,
         totalRevenue: totalRevenue + cancelledShowAmount,
         totalExpenses,
-        revenueAfterExpenses: revenueAfterExpenses + cancelledShowAmount,
-        founderRevenue: founderRevenue + cancelledShowAmount,
+        revenueAfterExpenses,
+        founderRevenue,
         cancelledShowAmount,
         upcomingCount,
         pendingAmount,

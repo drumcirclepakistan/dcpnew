@@ -500,78 +500,118 @@ export default function ShowDetail() {
                   This will mark "{show.title}" as cancelled. Cancelled shows are excluded from all earnings calculations.
                 </AlertDialogDescription>
               </AlertDialogHeader>
-              <div className="space-y-4 py-2">
-                <div>
-                  <label className="text-sm font-medium mb-1.5 block">Reason for cancellation (optional)</label>
-                  <Textarea
-                    value={cancellationReason}
-                    onChange={(e) => setCancellationReason(e.target.value)}
-                    placeholder="e.g. Client postponed, weather issues..."
-                    data-testid="input-cancellation-reason"
-                    className="resize-none"
-                    rows={2}
-                  />
-                </div>
+              {(() => {
+                const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0);
+                const fundsReceived = show.isPaid ? show.totalAmount : show.advancePayment;
+                const availableForRefund = Math.max(0, fundsReceived - totalExpenses);
+                const hasReceivedFunds = fundsReceived > 0;
 
-                {show.advancePayment > 0 && (
-                  <div>
-                    <label className="text-sm font-medium mb-1.5 block">
-                      Advance Payment: Rs {show.advancePayment.toLocaleString()}
-                    </label>
-                    <Select value={refundType} onValueChange={(val) => {
-                      setRefundType(val);
-                      if (val !== "partial") setRefundAmount("");
-                    }}>
-                      <SelectTrigger data-testid="select-refund-type">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="non_refundable">Advance will not be refunded</SelectItem>
-                        <SelectItem value="partial">Partial refund</SelectItem>
-                        <SelectItem value="complete">Complete refund (Rs {show.advancePayment.toLocaleString()})</SelectItem>
-                      </SelectContent>
-                    </Select>
+                return (
+                  <div className="space-y-4 py-2">
+                    <div>
+                      <label className="text-sm font-medium mb-1.5 block">Reason for cancellation (optional)</label>
+                      <Textarea
+                        value={cancellationReason}
+                        onChange={(e) => setCancellationReason(e.target.value)}
+                        placeholder="e.g. Client postponed, weather issues..."
+                        data-testid="input-cancellation-reason"
+                        className="resize-none"
+                        rows={2}
+                      />
+                    </div>
 
-                    {refundType === "partial" && (
-                      <div className="mt-2">
-                        <label className="text-xs text-muted-foreground mb-1 block">Refund amount (Rs)</label>
-                        <Input
-                          type="number"
-                          value={refundAmount}
-                          onChange={(e) => setRefundAmount(e.target.value)}
-                          placeholder="Enter refund amount"
-                          max={show.advancePayment}
-                          data-testid="input-refund-amount"
-                        />
-                        {Number(refundAmount) > show.advancePayment && (
-                          <p className="text-xs text-destructive mt-1">Refund cannot exceed advance payment</p>
+                    {hasReceivedFunds && (
+                      <div>
+                        <div className="text-sm space-y-1 mb-3 p-3 rounded-md bg-muted/50">
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">{show.isPaid ? "Total Paid" : "Advance Received"}</span>
+                            <span className="font-medium">Rs {fundsReceived.toLocaleString()}</span>
+                          </div>
+                          {totalExpenses > 0 && (
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Expenses Incurred</span>
+                              <span className="font-medium text-destructive">- Rs {totalExpenses.toLocaleString()}</span>
+                            </div>
+                          )}
+                          <Separator className="my-1" />
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground font-medium">Available for Refund</span>
+                            <span className="font-bold">Rs {availableForRefund.toLocaleString()}</span>
+                          </div>
+                        </div>
+
+                        {availableForRefund > 0 ? (
+                          <>
+                            <Select value={refundType} onValueChange={(val) => {
+                              setRefundType(val);
+                              if (val !== "partial") setRefundAmount("");
+                            }}>
+                              <SelectTrigger data-testid="select-refund-type">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="non_refundable">Will not be refunded</SelectItem>
+                                <SelectItem value="partial">Partial refund</SelectItem>
+                                <SelectItem value="complete">Complete refund (Rs {availableForRefund.toLocaleString()})</SelectItem>
+                              </SelectContent>
+                            </Select>
+
+                            {refundType === "partial" && (
+                              <div className="mt-2">
+                                <label className="text-xs text-muted-foreground mb-1 block">Refund amount (Rs)</label>
+                                <Input
+                                  type="number"
+                                  value={refundAmount}
+                                  onChange={(e) => setRefundAmount(e.target.value)}
+                                  placeholder={`Max Rs ${availableForRefund.toLocaleString()}`}
+                                  max={availableForRefund}
+                                  data-testid="input-refund-amount"
+                                />
+                                {Number(refundAmount) > availableForRefund && (
+                                  <p className="text-xs text-destructive mt-1">Refund cannot exceed available funds (Rs {availableForRefund.toLocaleString()})</p>
+                                )}
+                              </div>
+                            )}
+
+                            <p className="text-xs text-muted-foreground mt-2">
+                              {refundType === "non_refundable" && `Rs ${availableForRefund.toLocaleString()} will be retained from this cancelled show.`}
+                              {refundType === "complete" && `Rs ${availableForRefund.toLocaleString()} will be refunded. No amount retained.`}
+                              {refundType === "partial" && refundAmount && Number(refundAmount) <= availableForRefund && `Rs ${Number(refundAmount).toLocaleString()} refunded. Rs ${(availableForRefund - Number(refundAmount)).toLocaleString()} retained.`}
+                            </p>
+                          </>
+                        ) : (
+                          <p className="text-xs text-muted-foreground">
+                            All received funds have been used for expenses. No amount available for refund.
+                          </p>
                         )}
                       </div>
                     )}
-
-                    <p className="text-xs text-muted-foreground mt-2">
-                      {refundType === "non_refundable" && `Rs ${show.advancePayment.toLocaleString()} will be retained from this cancelled show.`}
-                      {refundType === "complete" && "Full advance will be returned. No amount retained."}
-                      {refundType === "partial" && refundAmount && Number(refundAmount) <= show.advancePayment && `Rs ${(show.advancePayment - Number(refundAmount)).toLocaleString()} will be retained from this cancelled show.`}
-                    </p>
                   </div>
-                )}
-              </div>
+                );
+              })()}
               <AlertDialogFooter>
                 <AlertDialogCancel data-testid="button-cancel-cancel">Go Back</AlertDialogCancel>
                 <AlertDialogAction
                   data-testid="button-confirm-cancel"
-                  disabled={refundType === "partial" && (!refundAmount || Number(refundAmount) > show.advancePayment || Number(refundAmount) < 0)}
+                  disabled={refundType === "partial" && (() => {
+                    const totalExp = expenses.reduce((s, e) => s + e.amount, 0);
+                    const funds = show.isPaid ? show.totalAmount : show.advancePayment;
+                    const avail = Math.max(0, funds - totalExp);
+                    return !refundAmount || Number(refundAmount) > avail || Number(refundAmount) < 0;
+                  })()}
                   onClick={() => {
+                    const totalExp = expenses.reduce((s, e) => s + e.amount, 0);
+                    const fundsReceived = show.isPaid ? show.totalAmount : show.advancePayment;
+                    const availableForRefund = Math.max(0, fundsReceived - totalExp);
                     const computedRefundAmount = refundType === "complete"
-                      ? show.advancePayment
+                      ? availableForRefund
                       : refundType === "partial"
                         ? Number(refundAmount)
                         : 0;
                     cancelShowMutation.mutate({
                       status: "cancelled",
                       cancellationReason: cancellationReason.trim(),
-                      refundType: show.advancePayment > 0 ? refundType : "non_refundable",
+                      refundType: fundsReceived > 0 ? refundType : "non_refundable",
                       refundAmount: computedRefundAmount,
                     });
                   }}
@@ -725,36 +765,51 @@ export default function ShowDetail() {
                     </div>
                   </div>
 
-                  {show.advancePayment > 0 && (
-                    <div className="flex items-start gap-3">
-                      <Receipt className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
-                      <div>
-                        <p className="text-xs text-muted-foreground">Advance Refund Status</p>
-                        <div className="mt-1" data-testid="text-refund-status">
-                          {(!show.refundType || show.refundType === "non_refundable") && (
-                            <div>
-                              <Badge variant="secondary">Non-refundable</Badge>
-                              <p className="text-sm mt-1">Rs {show.advancePayment.toLocaleString()} retained</p>
-                            </div>
-                          )}
-                          {show.refundType === "complete" && (
-                            <div>
-                              <Badge variant="outline">Complete Refund</Badge>
-                              <p className="text-sm mt-1">Rs {show.advancePayment.toLocaleString()} refunded</p>
-                            </div>
-                          )}
-                          {show.refundType === "partial" && (
-                            <div>
-                              <Badge variant="outline">Partial Refund</Badge>
-                              <p className="text-sm mt-1">
-                                Rs {(show.refundAmount || 0).toLocaleString()} refunded, Rs {(show.advancePayment - (show.refundAmount || 0)).toLocaleString()} retained
-                              </p>
-                            </div>
-                          )}
+                  {(() => {
+                    const totalExp = expenses.reduce((s, e) => s + e.amount, 0);
+                    const fundsReceived = show.isPaid ? show.totalAmount : show.advancePayment;
+                    const afterExpenses = Math.max(0, fundsReceived - totalExp);
+                    const retained = Math.max(0, afterExpenses - (show.refundAmount || 0));
+                    return fundsReceived > 0 ? (
+                      <div className="flex items-start gap-3">
+                        <Receipt className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                        <div>
+                          <p className="text-xs text-muted-foreground">Refund Status</p>
+                          <div className="mt-1 space-y-1" data-testid="text-refund-status">
+                            {(!show.refundType || show.refundType === "non_refundable") && (
+                              <div>
+                                <Badge variant="secondary">Non-refundable</Badge>
+                                {totalExp > 0 ? (
+                                  <p className="text-sm mt-1">Rs {totalExp.toLocaleString()} used for expenses, Rs {retained.toLocaleString()} retained</p>
+                                ) : (
+                                  <p className="text-sm mt-1">Rs {fundsReceived.toLocaleString()} retained</p>
+                                )}
+                              </div>
+                            )}
+                            {show.refundType === "complete" && (
+                              <div>
+                                <Badge variant="outline">Complete Refund</Badge>
+                                <p className="text-sm mt-1">
+                                  Rs {(show.refundAmount || 0).toLocaleString()} refunded
+                                  {totalExp > 0 ? `, Rs ${totalExp.toLocaleString()} used for expenses` : ""}
+                                </p>
+                              </div>
+                            )}
+                            {show.refundType === "partial" && (
+                              <div>
+                                <Badge variant="outline">Partial Refund</Badge>
+                                <p className="text-sm mt-1">
+                                  Rs {(show.refundAmount || 0).toLocaleString()} refunded
+                                  {totalExp > 0 ? `, Rs ${totalExp.toLocaleString()} expenses` : ""}
+                                  {retained > 0 ? `, Rs ${retained.toLocaleString()} retained` : ""}
+                                </p>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  )}
+                    ) : null;
+                  })()}
                 </div>
               )}
             </CardContent>
