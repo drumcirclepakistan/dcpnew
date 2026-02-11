@@ -3,7 +3,7 @@ import { db } from "./db";
 import { desc } from "drizzle-orm";
 import {
   users, shows, showExpenses, showMembers, settings, bandMembers, showTypesTable,
-  notifications, activityLogs,
+  notifications, activityLogs, retainedFundAllocations,
   type User, type InsertUser, type Show, type InsertShow,
   type ShowExpense, type InsertExpense,
   type ShowMember, type InsertMember,
@@ -11,6 +11,7 @@ import {
   type BandMember, type InsertBandMember,
   type Notification, type InsertNotification,
   type ActivityLog, type InsertActivityLog,
+  type RetainedFundAllocation, type InsertRetainedFundAllocation,
 } from "@shared/schema";
 import { scrypt, randomBytes } from "crypto";
 import { promisify } from "util";
@@ -75,6 +76,11 @@ export interface IStorage {
   createActivityLog(log: InsertActivityLog): Promise<ActivityLog>;
   getActivityLogs(limit?: number, offset?: number): Promise<ActivityLog[]>;
   getActivityLogCount(): Promise<number>;
+
+  getRetainedFundAllocations(showId: string): Promise<RetainedFundAllocation[]>;
+  replaceRetainedFundAllocations(showId: string, allocations: InsertRetainedFundAllocation[]): Promise<RetainedFundAllocation[]>;
+  deleteRetainedFundAllocations(showId: string): Promise<void>;
+  getAllRetainedFundAllocations(): Promise<RetainedFundAllocation[]>;
 
   getShowTypes(userId: string): Promise<{ id: string; name: string; userId: string; showOrgField: boolean; showPublicField: boolean }[]>;
   getShowType(id: string): Promise<{ id: string; name: string; userId: string; showOrgField: boolean; showPublicField: boolean } | undefined>;
@@ -275,6 +281,25 @@ export class DatabaseStorage implements IStorage {
   async deleteShowType(id: string): Promise<boolean> {
     const result = await db.delete(showTypesTable).where(eq(showTypesTable.id, id)).returning();
     return result.length > 0;
+  }
+
+  async getRetainedFundAllocations(showId: string): Promise<RetainedFundAllocation[]> {
+    return db.select().from(retainedFundAllocations).where(eq(retainedFundAllocations.showId, showId));
+  }
+
+  async replaceRetainedFundAllocations(showId: string, allocations: InsertRetainedFundAllocation[]): Promise<RetainedFundAllocation[]> {
+    await db.delete(retainedFundAllocations).where(eq(retainedFundAllocations.showId, showId));
+    if (allocations.length === 0) return [];
+    const created = await db.insert(retainedFundAllocations).values(allocations).returning();
+    return created;
+  }
+
+  async deleteRetainedFundAllocations(showId: string): Promise<void> {
+    await db.delete(retainedFundAllocations).where(eq(retainedFundAllocations.showId, showId));
+  }
+
+  async getAllRetainedFundAllocations(): Promise<RetainedFundAllocation[]> {
+    return db.select().from(retainedFundAllocations);
   }
 
   async getNotifications(userId: string): Promise<Notification[]> {
