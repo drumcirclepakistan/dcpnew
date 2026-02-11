@@ -15,3 +15,4 @@ databases:
   - name: fullstack-db
     databaseName: fullstack
     user: fullstack_user
+    plan: free
