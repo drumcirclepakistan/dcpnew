@@ -909,38 +909,6 @@ export default function ShowDetail() {
                       }));
                     }
 
-                    if (allocationSplitMode === "payout_rules") {
-                      let totalWeight = 0;
-                      const weights = selected.map(m => {
-                        let w = 0;
-                        if (m.paymentType === "percentage") {
-                          w = m.normalRate || 0;
-                        } else {
-                          w = m.normalRate || 0;
-                        }
-                        totalWeight += w;
-                        return { member: m, weight: w };
-                      });
-                      if (totalWeight === 0) {
-                        const base = Math.floor(retainedAmt / selected.length);
-                        const remainder = retainedAmt - (base * selected.length);
-                        return selected.map((m, i) => ({
-                          bandMemberId: m.id,
-                          memberName: m.name,
-                          amount: base + (i === 0 ? remainder : 0),
-                        }));
-                      }
-                      let allocated = 0;
-                      const results = weights.map((w, i) => {
-                        const amt = i === weights.length - 1
-                          ? retainedAmt - allocated
-                          : Math.round((w.weight / totalWeight) * retainedAmt);
-                        allocated += amt;
-                        return { bandMemberId: w.member.id, memberName: w.member.name, amount: amt };
-                      });
-                      return results;
-                    }
-
                     if (allocationSplitMode === "manual") {
                       return selected.map(m => ({
                         bandMemberId: m.id,
@@ -1110,10 +1078,6 @@ export default function ShowDetail() {
                                     <Label htmlFor="split-equal" className="text-sm cursor-pointer">Equal Split</Label>
                                   </div>
                                   <div className="flex items-center gap-2">
-                                    <RadioGroupItem value="payout_rules" id="split-rules" />
-                                    <Label htmlFor="split-rules" className="text-sm cursor-pointer">According to Payout Rules</Label>
-                                  </div>
-                                  <div className="flex items-center gap-2">
                                     <RadioGroupItem value="manual" id="split-manual" />
                                     <Label htmlFor="split-manual" className="text-sm cursor-pointer">Manual Amounts</Label>
                                   </div>
@@ -1143,7 +1107,7 @@ export default function ShowDetail() {
                               </div>
                             )}
 
-                            {allocationSelectedMembers.length > 0 && (allocationSplitMode === "equal" || allocationSplitMode === "payout_rules") && (
+                            {allocationSelectedMembers.length > 0 && allocationSplitMode === "equal" && (
                               <div className="space-y-1 text-sm border rounded-md p-3">
                                 <p className="text-xs text-muted-foreground font-medium mb-1">Preview</p>
                                 {previewAllocations.map(a => (
