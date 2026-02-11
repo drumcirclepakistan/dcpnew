@@ -473,6 +473,55 @@ export async function registerRoutes(
     res.json({ message: "Deleted" });
   });
 
+  app.get("/api/shows/:id/retained-allocations", requireAdmin, async (req, res) => {
+    const allocations = await storage.getRetainedFundAllocations(req.params.id as string);
+    res.json(allocations);
+  });
+
+  app.put("/api/shows/:id/retained-allocations", requireAdmin, async (req, res) => {
+    try {
+      const show = await storage.getShow(req.params.id as string);
+      if (!show || show.userId !== req.session.userId) {
+        return res.status(404).json({ message: "Show not found" });
+      }
+      if (show.status !== "cancelled") {
+        return res.status(400).json({ message: "Show is not cancelled" });
+      }
+      const expenses = await storage.getShowExpenses(show.id);
+      const totalExp = expenses.reduce((s, e) => s + e.amount, 0);
+      const fundsReceived = show.isPaid ? show.totalAmount : show.advancePayment;
+      const afterExpenses = Math.max(0, fundsReceived - totalExp);
+      const retainedAmount = Math.max(0, afterExpenses - (show.refundAmount || 0));
+
+      if (retainedAmount <= 0) {
+        return res.status(400).json({ message: "No retained funds to allocate" });
+      }
+
+      const allocations = req.body.allocations || [];
+      const totalAllocated = allocations.reduce((s: number, a: any) => s + (Number(a.amount) || 0), 0);
+      if (totalAllocated > retainedAmount) {
+        return res.status(400).json({ message: `Total allocated (Rs ${totalAllocated}) exceeds retained amount (Rs ${retainedAmount})` });
+      }
+
+      const parsed = allocations.map((a: any) => ({
+        showId: show.id,
+        bandMemberId: a.bandMemberId,
+        memberName: a.memberName,
+        amount: Number(a.amount),
+      }));
+
+      const created = await storage.replaceRetainedFundAllocations(show.id, parsed);
+      res.json(created);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Failed to save allocations" });
+    }
+  });
+
+  app.delete("/api/shows/:id/retained-allocations", requireAdmin, async (req, res) => {
+    await storage.deleteRetainedFundAllocations(req.params.id as string);
+    res.json({ message: "Allocations cleared" });
+  });
+
   app.put("/api/shows/:id/members", requireAdmin, async (req, res) => {
     try {
       const show = await storage.getShow(req.params.id as string);
