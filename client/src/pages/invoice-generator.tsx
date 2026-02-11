@@ -328,9 +328,6 @@ export default function InvoiceGeneratorPage() {
     onSuccess: (invoice: Invoice) => {
       queryClient.invalidateQueries({ queryKey: [apiBase] });
       toast({ title: `${invoice.type === "invoice" ? "Invoice" : "Quotation"} created`, description: invoice.displayNumber });
-      if (isAdmin) {
-        downloadInvoicePDF(invoice);
-      }
       resetForm();
     },
     onError: (err: any) => {
