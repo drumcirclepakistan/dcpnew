@@ -703,7 +703,7 @@ export async function registerRoutes(
 
       res.json({
         totalShows: filteredShows.length,
-        totalRevenue: totalRevenue + cancelledShowAmount,
+        totalRevenue,
         totalExpenses,
         revenueAfterExpenses,
         founderRevenue,
