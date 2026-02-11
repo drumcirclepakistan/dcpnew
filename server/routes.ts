@@ -1086,6 +1086,21 @@ export async function registerRoutes(
         }
       }
 
+      const allAllocsMember = await storage.getAllRetainedFundAllocations();
+      const allShowsIncCancelled = await getAllShowsForMember();
+      let retainedFundsEarnings = 0;
+      const memberAllocs = allAllocsMember.filter(a => a.bandMemberId === member.id);
+      for (const alloc of memberAllocs) {
+        const cancelledShow = allShowsIncCancelled.find(s => s.id === alloc.showId && s.status === "cancelled");
+        if (cancelledShow) {
+          const showDate = new Date(cancelledShow.showDate);
+          if (from && showDate < new Date(from)) continue;
+          if (to && showDate > new Date(to)) continue;
+          retainedFundsEarnings += alloc.amount;
+        }
+      }
+      totalEarnings += retainedFundsEarnings;
+
       let totalUpcoming = 0;
       let totalPending = 0;
       for (const show of allShows) {
@@ -1102,6 +1117,7 @@ export async function registerRoutes(
 
       res.json({
         totalEarnings,
+        retainedFundsEarnings,
         showsPerformed,
         upcomingCount: totalUpcoming,
         pendingPayments: totalPending,

@@ -53,6 +53,7 @@ interface MemberDashboardShow extends Show {
 
 interface MemberDashboardStats {
   totalEarnings: number;
+  retainedFundsEarnings: number;
   showsPerformed: number;
   upcomingCount: number;
   pendingPayments: number;
@@ -284,6 +285,7 @@ export default function Dashboard() {
                   icon={Crown}
                   testId="stat-total-earnings"
                   variant="highlight"
+                  subtitle={memberStats?.retainedFundsEarnings ? `includes Rs ${memberStats.retainedFundsEarnings.toLocaleString()} from cancelled show allocations` : undefined}
                 />
                 <StatCard
                   label="Shows Performed"
