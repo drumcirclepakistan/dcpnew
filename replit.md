@@ -145,6 +145,10 @@ A modern, mobile-friendly band management web app for Drum Circle Pakistan. Admi
 - `PATCH /api/notifications/:id/read` - Mark notification as read (authenticated)
 - `POST /api/notifications/mark-all-read` - Mark all notifications as read (authenticated)
 - `GET /api/activity-logs?limit=` - List activity logs (admin)
+- `GET /api/invoices?type=` - List invoices/quotations (admin)
+- `POST /api/invoices` - Create invoice/quotation (admin)
+- `PATCH /api/invoices/:id` - Update invoice/quotation (admin, owner-only)
+- `DELETE /api/invoices/:id` - Delete invoice/quotation (admin)
 
 ## User Preferences
 - Pakistani Rupees (Rs) for currency

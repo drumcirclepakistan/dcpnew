@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -34,10 +34,13 @@ import {
   Plus,
   Calendar as CalendarIcon,
   Filter,
+  Pencil,
 } from "lucide-react";
 import { format } from "date-fns";
 import type { Invoice } from "@shared/schema";
 import jsPDF from "jspdf";
+
+const TAX_RATE = 0.16;
 
 function generateInvoicePDF(invoice: Invoice) {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
@@ -49,7 +52,7 @@ function generateInvoicePDF(invoice: Invoice) {
   const typeLabel = invoice.type === "invoice" ? "INVOICE" : "QUOTATION";
   const eventDateStr = format(new Date(invoice.eventDate), "dd MMM yyyy");
   const createdDateStr = format(new Date(invoice.createdAt), "dd MMM yyyy");
-  const formattedAmount = parseInt(String(invoice.amount)).toLocaleString();
+  const baseAmount = Number(invoice.amount);
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(22);
@@ -78,7 +81,7 @@ function generateInvoicePDF(invoice: Invoice) {
   doc.setFont("helvetica", "bold");
   doc.setFontSize(10);
   doc.text("Description", marginLeft, y);
-  doc.text("Amount", pageWidth - marginRight, y, { align: "right" });
+  doc.text("Amount (Rs)", pageWidth - marginRight, y, { align: "right" });
 
   y += 3;
   doc.setDrawColor(220, 220, 220);
@@ -91,25 +94,66 @@ function generateInvoicePDF(invoice: Invoice) {
   const description = `DRUM CIRCLE \u2013 ${invoice.city} \u2013 ${eventDateStr} \u2013 ${invoice.numberOfDrums} DRUMS \u2013 ${invoice.duration}`;
   const descLines = doc.splitTextToSize(description, contentWidth - 40);
   doc.text(descLines, marginLeft, y);
-  doc.text(formattedAmount, pageWidth - marginRight, y, { align: "right" });
+  doc.text(baseAmount.toLocaleString(), pageWidth - marginRight, y, { align: "right" });
 
   y += descLines.length * 5 + 6;
   doc.setDrawColor(180, 180, 180);
   doc.setLineWidth(0.3);
   doc.line(marginLeft, y, pageWidth - marginRight, y);
 
-  y += 7;
-  doc.setFont("helvetica", "bold");
-  doc.text("Total", marginLeft, y);
-  doc.text(formattedAmount, pageWidth - marginRight, y, { align: "right" });
+  if (invoice.taxMode === "inclusive") {
+    const preGstAmount = Math.round(baseAmount / (1 + TAX_RATE));
+    const gstAmount = baseAmount - preGstAmount;
 
-  y += 12;
+    y += 7;
+    doc.setFont("helvetica", "normal");
+    doc.text("Amount before GST", marginLeft, y);
+    doc.text(preGstAmount.toLocaleString(), pageWidth - marginRight, y, { align: "right" });
+
+    y += 6;
+    doc.text(`GST (${Math.round(TAX_RATE * 100)}%)`, marginLeft, y);
+    doc.text(gstAmount.toLocaleString(), pageWidth - marginRight, y, { align: "right" });
+
+    y += 3;
+    doc.setDrawColor(220, 220, 220);
+    doc.setLineWidth(0.2);
+    doc.line(marginLeft, y, pageWidth - marginRight, y);
+
+    y += 7;
+    doc.setFont("helvetica", "bold");
+    doc.text("Total (Inclusive of GST)", marginLeft, y);
+    doc.text(baseAmount.toLocaleString(), pageWidth - marginRight, y, { align: "right" });
+  } else {
+    const gstAmount = Math.round(baseAmount * TAX_RATE);
+    const grandTotal = baseAmount + gstAmount;
+
+    y += 7;
+    doc.setFont("helvetica", "normal");
+    doc.text("Subtotal", marginLeft, y);
+    doc.text(baseAmount.toLocaleString(), pageWidth - marginRight, y, { align: "right" });
+
+    y += 6;
+    doc.text(`GST (${Math.round(TAX_RATE * 100)}%)`, marginLeft, y);
+    doc.text(gstAmount.toLocaleString(), pageWidth - marginRight, y, { align: "right" });
+
+    y += 3;
+    doc.setDrawColor(220, 220, 220);
+    doc.setLineWidth(0.2);
+    doc.line(marginLeft, y, pageWidth - marginRight, y);
+
+    y += 7;
+    doc.setFont("helvetica", "bold");
+    doc.text("Grand Total (Exclusive of GST)", marginLeft, y);
+    doc.text(grandTotal.toLocaleString(), pageWidth - marginRight, y, { align: "right" });
+  }
+
+  y += 10;
   doc.setFont("helvetica", "italic");
   doc.setFontSize(9);
   if (invoice.taxMode === "exclusive") {
-    doc.text("Exclusive of all taxes. Any applicable taxes will be charged separately.", marginLeft, y);
+    doc.text("All applicable taxes (GST @ 16%) are charged separately as shown above.", marginLeft, y);
   } else {
-    doc.text("Inclusive of all applicable taxes.", marginLeft, y);
+    doc.text("All applicable taxes (GST @ 16%) are included in the total amount as shown above.", marginLeft, y);
   }
 
   y += 14;
@@ -185,6 +229,7 @@ function downloadInvoicePDF(invoice: Invoice) {
 export default function InvoiceGeneratorPage() {
   const { toast } = useToast();
   const [showForm, setShowForm] = useState(false);
+  const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
 
@@ -226,6 +271,21 @@ export default function InvoiceGeneratorPage() {
     },
   });
 
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: any }) => {
+      const res = await apiRequest("PATCH", `/api/invoices/${id}`, data);
+      return res.json();
+    },
+    onSuccess: (invoice: Invoice) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/invoices"] });
+      toast({ title: `${invoice.type === "invoice" ? "Invoice" : "Quotation"} updated`, description: invoice.displayNumber });
+      resetForm();
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
       await apiRequest("DELETE", `/api/invoices/${id}`);
@@ -239,6 +299,8 @@ export default function InvoiceGeneratorPage() {
 
   function resetForm() {
     setShowForm(false);
+    setEditingInvoice(null);
+    setFormType("invoice");
     setBillTo("");
     setCity("");
     setNumberOfDrums("");
@@ -248,12 +310,25 @@ export default function InvoiceGeneratorPage() {
     setTaxMode("exclusive");
   }
 
+  function startEdit(inv: Invoice) {
+    setEditingInvoice(inv);
+    setFormType(inv.type);
+    setBillTo(inv.billTo);
+    setCity(inv.city);
+    setNumberOfDrums(String(inv.numberOfDrums));
+    setDuration(inv.duration);
+    setEventDate(new Date(inv.eventDate));
+    setAmount(String(inv.amount));
+    setTaxMode(inv.taxMode);
+    setShowForm(true);
+  }
+
   function handleSubmit() {
     if (!billTo || !city || !numberOfDrums || !duration || !eventDate || !amount) {
       toast({ title: "Please fill all fields", variant: "destructive" });
       return;
     }
-    createMutation.mutate({
+    const payload = {
       type: formType,
       billTo,
       city,
@@ -262,7 +337,13 @@ export default function InvoiceGeneratorPage() {
       eventDate: eventDate.toISOString(),
       amount: parseInt(amount),
       taxMode,
-    });
+    };
+
+    if (editingInvoice) {
+      updateMutation.mutate({ id: editingInvoice.id, data: payload });
+    } else {
+      createMutation.mutate(payload);
+    }
   }
 
   const filtered = useMemo(() => {
@@ -277,6 +358,21 @@ export default function InvoiceGeneratorPage() {
     );
   }, [invoicesList, search]);
 
+  const isPending = createMutation.isPending || updateMutation.isPending;
+
+  function getTaxDisplay(inv: Invoice) {
+    const amt = Number(inv.amount);
+    if (inv.taxMode === "inclusive") {
+      const preGst = Math.round(amt / (1 + TAX_RATE));
+      const gst = amt - preGst;
+      return `Rs ${amt.toLocaleString()} (incl. GST Rs ${gst.toLocaleString()})`;
+    } else {
+      const gst = Math.round(amt * TAX_RATE);
+      const total = amt + gst;
+      return `Rs ${amt.toLocaleString()} + GST Rs ${gst.toLocaleString()} = Rs ${total.toLocaleString()}`;
+    }
+  }
+
   return (
     <div className="p-4 md:p-6 max-w-4xl mx-auto space-y-6">
       <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -284,10 +380,12 @@ export default function InvoiceGeneratorPage() {
           <h1 className="text-xl font-bold" data-testid="text-invoice-page-title">Invoice Generator</h1>
           <p className="text-sm text-muted-foreground">Create and manage invoices & quotations</p>
         </div>
-        <Button onClick={() => setShowForm(true)} data-testid="button-create-invoice">
-          <Plus className="w-4 h-4 mr-1" />
-          Create New
-        </Button>
+        {!showForm && (
+          <Button onClick={() => { resetForm(); setShowForm(true); }} data-testid="button-create-invoice">
+            <Plus className="w-4 h-4 mr-1" />
+            Create New
+          </Button>
+        )}
       </div>
 
       {showForm && (
@@ -295,7 +393,9 @@ export default function InvoiceGeneratorPage() {
           <CardContent className="pt-5 space-y-4">
             <div className="flex items-center gap-3 flex-wrap">
               <h2 className="text-base font-semibold">
-                New {formType === "invoice" ? "Invoice" : "Quotation"}
+                {editingInvoice
+                  ? `Edit ${editingInvoice.displayNumber}`
+                  : `New ${formType === "invoice" ? "Invoice" : "Quotation"}`}
               </h2>
             </div>
 
@@ -388,24 +488,58 @@ export default function InvoiceGeneratorPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="exclusive">Exclusive of Taxes</SelectItem>
-                    <SelectItem value="inclusive">Inclusive of Taxes</SelectItem>
+                    <SelectItem value="exclusive">Exclusive of GST</SelectItem>
+                    <SelectItem value="inclusive">Inclusive of GST</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
 
+            {amount && parseInt(amount) > 0 && (
+              <div className="text-xs text-muted-foreground p-2.5 rounded-md bg-muted/50">
+                {taxMode === "inclusive" ? (
+                  <>
+                    <span className="font-medium">Inclusive breakdown:</span>{" "}
+                    Amount before GST: Rs {Math.round(parseInt(amount) / (1 + TAX_RATE)).toLocaleString()}{" "}
+                    + GST (16%): Rs {(parseInt(amount) - Math.round(parseInt(amount) / (1 + TAX_RATE))).toLocaleString()}{" "}
+                    = Total: Rs {parseInt(amount).toLocaleString()}
+                  </>
+                ) : (
+                  <>
+                    <span className="font-medium">Exclusive breakdown:</span>{" "}
+                    Subtotal: Rs {parseInt(amount).toLocaleString()}{" "}
+                    + GST (16%): Rs {Math.round(parseInt(amount) * TAX_RATE).toLocaleString()}{" "}
+                    = Grand Total: Rs {(parseInt(amount) + Math.round(parseInt(amount) * TAX_RATE)).toLocaleString()}
+                  </>
+                )}
+              </div>
+            )}
+
             <div className="flex items-center gap-2 justify-end flex-wrap">
               <Button variant="outline" onClick={resetForm} data-testid="button-cancel-form">
                 Cancel
               </Button>
+              {editingInvoice && (
+                <Button
+                  variant="outline"
+                  onClick={() => downloadInvoicePDF({ ...editingInvoice, type: formType, billTo, city, numberOfDrums: parseInt(numberOfDrums) || 0, duration, eventDate: eventDate ? eventDate.toISOString() : editingInvoice.eventDate, amount: parseInt(amount) || 0, taxMode } as Invoice)}
+                  data-testid="button-preview-pdf"
+                >
+                  <Download className="w-4 h-4 mr-1" />
+                  Preview PDF
+                </Button>
+              )}
               <Button
                 onClick={handleSubmit}
-                disabled={createMutation.isPending}
+                disabled={isPending}
                 data-testid="button-generate"
               >
                 <FileText className="w-4 h-4 mr-1" />
-                {createMutation.isPending ? "Generating..." : `Generate & Download`}
+                {isPending
+                  ? (editingInvoice ? "Saving..." : "Generating...")
+                  : editingInvoice
+                    ? "Save Changes"
+                    : "Generate & Download"}
               </Button>
             </div>
           </CardContent>
@@ -454,7 +588,7 @@ export default function InvoiceGeneratorPage() {
           <Card>
             <CardContent className="pt-8 pb-8 text-center">
               <FileText className="w-10 h-10 mx-auto text-muted-foreground mb-2" />
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-muted-foreground" data-testid="text-empty-state">
                 {search ? "No results found" : "No invoices or quotations yet"}
               </p>
             </CardContent>
@@ -473,6 +607,9 @@ export default function InvoiceGeneratorPage() {
                         <Badge variant={inv.type === "invoice" ? "default" : "secondary"}>
                           {inv.type === "invoice" ? "Invoice" : "Quotation"}
                         </Badge>
+                        <Badge variant="outline" className="text-[10px]">
+                          {inv.taxMode === "inclusive" ? "GST Inclusive" : "GST Exclusive"}
+                        </Badge>
                       </div>
                       <p className="text-sm mt-0.5" data-testid={`text-invoice-client-${inv.id}`}>
                         {inv.billTo}
@@ -486,15 +623,26 @@ export default function InvoiceGeneratorPage() {
                           {inv.numberOfDrums} drums
                         </span>
                       </div>
+                      <p className="text-xs text-muted-foreground mt-0.5" data-testid={`text-invoice-tax-${inv.id}`}>
+                        {getTaxDisplay(inv)}
+                      </p>
                       <p className="text-xs text-muted-foreground mt-0.5">
                         Created: {format(new Date(inv.createdAt), "dd MMM yyyy")}
                       </p>
                     </div>
                     <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
                       <span className="text-sm font-semibold" data-testid={`text-invoice-amount-${inv.id}`}>
-                        Rs {inv.amount.toLocaleString()}
+                        Rs {Number(inv.amount).toLocaleString()}
                       </span>
                       <div className="flex items-center gap-1">
+                        <Button
+                          size="icon"
+                          variant="outline"
+                          onClick={() => startEdit(inv)}
+                          data-testid={`button-edit-${inv.id}`}
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </Button>
                         <Button
                           size="sm"
                           variant="outline"

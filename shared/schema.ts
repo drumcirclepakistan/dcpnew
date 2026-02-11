@@ -270,6 +270,10 @@ export const insertInvoiceSchema = createInsertSchema(invoices).omit({
   userId: true,
   number: true,
   displayNumber: true,
+}).extend({
+  eventDate: z.union([z.date(), z.string()]).transform((val) => (typeof val === "string" ? new Date(val) : val)),
+  numberOfDrums: z.union([z.number(), z.string()]).transform((val) => (typeof val === "string" ? parseInt(val, 10) : val)),
+  amount: z.union([z.number(), z.string()]).transform((val) => (typeof val === "string" ? parseInt(val, 10) : val)),
 });
 
 export type InsertInvoice = z.infer<typeof insertInvoiceSchema>;

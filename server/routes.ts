@@ -1823,7 +1823,7 @@ export async function registerRoutes(
         city,
         numberOfDrums,
         duration,
-        eventDate: new Date(eventDate),
+        eventDate: eventDate instanceof Date ? eventDate : new Date(eventDate),
         amount,
         taxMode: taxMode || "exclusive",
         number: nextNumber,
@@ -1837,6 +1837,39 @@ export async function registerRoutes(
       res.json(invoice);
     } catch (err: any) {
       res.status(500).json({ message: err.message || "Failed to create invoice" });
+    }
+  });
+
+  app.patch("/api/invoices/:id", requireAdmin, async (req, res) => {
+    try {
+      const invoiceId = req.params.id as string;
+      const existing = await storage.getInvoice(invoiceId);
+      if (!existing) return res.status(404).json({ message: "Not found" });
+      if (existing.userId !== req.session.userId) return res.status(403).json({ message: "Not authorized" });
+
+      const parsed = insertInvoiceSchema.partial().safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid data", errors: parsed.error.errors });
+      }
+
+      const updateData: any = {};
+      const { type, billTo, city, numberOfDrums, duration, eventDate, amount, taxMode } = parsed.data;
+      if (type !== undefined) updateData.type = type;
+      if (billTo !== undefined) updateData.billTo = billTo;
+      if (city !== undefined) updateData.city = city;
+      if (numberOfDrums !== undefined) updateData.numberOfDrums = numberOfDrums;
+      if (duration !== undefined) updateData.duration = duration;
+      if (eventDate !== undefined) updateData.eventDate = eventDate instanceof Date ? eventDate : new Date(String(eventDate));
+      if (amount !== undefined) updateData.amount = amount;
+      if (taxMode !== undefined) updateData.taxMode = taxMode;
+
+      const updated = await storage.updateInvoice(invoiceId, updateData);
+      const user = await storage.getUser(req.session.userId!);
+      await logActivity(req.session.userId!, user?.displayName || "Admin", `Updated ${updated?.type || existing.type}`, `${existing.displayNumber} for ${updated?.billTo || existing.billTo}`);
+
+      res.json(updated);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Failed to update invoice" });
     }
   });
 
