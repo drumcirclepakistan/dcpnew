@@ -760,7 +760,7 @@ export async function registerRoutes(
       const totalRevenue = filteredShows.reduce((s, sh) => s + sh.totalAmount, 0);
       const revenueAfterExpenses = totalRevenue - totalExpenses;
 
-      const paidCompletedShows = filteredShows.filter(s => s.status === "completed" && s.isPaid);
+      const paidCompletedShows = filteredShows.filter(s => new Date(s.showDate) <= new Date() && s.isPaid);
       let paidShowExpenses = 0;
       let paidShowMemberPayouts = 0;
       for (const show of paidCompletedShows) {
@@ -774,7 +774,8 @@ export async function registerRoutes(
       const paidShowRevenue = paidCompletedShows.reduce((s, sh) => s + sh.totalAmount, 0);
       const founderEarningsFromPaidShows = paidShowRevenue - paidShowExpenses - paidShowMemberPayouts;
 
-      const completedFilteredShows = filteredShows.filter((s) => s.status === "completed");
+      const now = new Date();
+      const completedFilteredShows = filteredShows.filter((s) => new Date(s.showDate) <= now);
       const cityCount: Record<string, number> = {};
       const typeCount: Record<string, number> = {};
       for (const show of completedFilteredShows) {
@@ -792,11 +793,11 @@ export async function registerRoutes(
         .map(([type, count]) => ({ type, count }));
 
       const activeShows = allShows.filter(s => s.status !== "cancelled");
-      const upcomingCount = activeShows.filter((s) => s.status === "upcoming").length;
+      const upcomingCount = activeShows.filter((s) => new Date(s.showDate) > now).length;
       const pendingAmount = activeShows
         .filter((s) => !s.isPaid)
         .reduce((s, sh) => s + (sh.totalAmount - sh.advancePayment), 0);
-      const noAdvanceCount = activeShows.filter((s) => s.status === "upcoming" && s.advancePayment === 0).length;
+      const noAdvanceCount = activeShows.filter((s) => new Date(s.showDate) > now && s.advancePayment === 0).length;
 
       let cancelledShows = allShows.filter(s => s.status === "cancelled");
       if (from) {
