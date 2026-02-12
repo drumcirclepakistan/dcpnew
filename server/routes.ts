@@ -46,10 +46,10 @@ export async function registerRoutes(
       secret: process.env.SESSION_SECRET || "drum-circle-pk-secret-2024",
       resave: false,
       saveUninitialized: false,
-      cookie: {
+            cookie: {
         maxAge: 30 * 24 * 60 * 60 * 1000,
         httpOnly: true,
-        secure: false,
+        secure: process.env.NODE_ENV === "production", // <--- Update this to use env check
         sameSite: "lax",
       },
     })
